@@ -16,7 +16,7 @@ import {
   ArrowDownLeftIcon,
   CheckCircleIcon,
   XMarkIcon,
-  SparklesIcon,
+  // SparklesIcon,
   TrophyIcon,
   UserGroupIcon,
   ChevronRightIcon,
@@ -24,7 +24,7 @@ import {
   ArrowPathIcon,
   InformationCircleIcon,
   ClockIcon,
-  BanknotesIcon,
+  // BanknotesIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
 

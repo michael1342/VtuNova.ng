@@ -91,8 +91,8 @@ export default function Profile() {
 
   // Toast Alerts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [_, setCopiedCode] = useState(false);
+  const [__, setCopiedLink] = useState(false);
 
   // Developer Control Switcher
   const [isEmptyActivity, setIsEmptyActivity] = useState(false);
