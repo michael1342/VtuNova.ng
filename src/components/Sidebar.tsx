@@ -15,8 +15,8 @@ import {
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
   ArrowRightOnRectangleIcon,
-  ChevronRightIcon,
-  ChevronLeftIcon,
+  // ChevronRightIcon,
+  // ChevronLeftIcon,
 } from '@heroicons/react/24/outline';
 
 // solid icons

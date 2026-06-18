@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/themeContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -23,9 +24,18 @@ import './App.css'
 
 // const {currentUser} = useAuth();
 
-const ProtectedRoute = ({ allowedRoles, children }) => {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
+type ProtectedRouteProps = {
+  allowedRoles: string[];
+  children: ReactNode
+}
+
+
+const ProtectedRoute = ({ allowedRoles, children}:  ProtectedRouteProps) => {
+
+  type CurrentUserProps = {
+    role: string;
+  }
+  const { currentUser } = useAuth() as {currentUser: CurrentUserProps | null;}
 
   if (!currentUser) {
     //  return navigate('/');
@@ -41,6 +51,16 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
 
   return children;
 }
+
+// type ProtectedRouteProps = {
+//   allowedRoles: string[];
+//   children: ReactNode;
+// };
+
+// const ProtectedRoute = ({
+//   allowedRoles,
+//   children,
+// }: ProtectedRouteProps) => 
 
 
 function App() {
