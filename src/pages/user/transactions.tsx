@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 
 
 
@@ -141,7 +140,7 @@ const Transactions = () => {
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
-  const [dateRange, setDateRange] = useState<string>('Last 30 Days');
+  const [, setDateRange] = useState<string>('Last 30 Days');
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
 

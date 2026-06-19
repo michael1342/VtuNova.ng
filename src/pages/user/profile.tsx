@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../context/themeContext';
-import { useAuth } from '../../context/AuthContext';
+// import { useAuth } from '../../context/AuthContext';
 import {
   UserIcon,
   EnvelopeIcon,
@@ -18,15 +18,12 @@ import {
   ArrowRightOnRectangleIcon,
   LockClosedIcon,
   DevicePhoneMobileIcon,
-  IdentificationIcon,
   MapPinIcon,
-  ArrowPathIcon,
   CheckIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XMarkIcon,
   TrophyIcon,
-  CurrencyDollarIcon,
   InformationCircleIcon,
   SparklesIcon,
   ClockIcon
@@ -48,7 +45,7 @@ interface ActivityEvent {
 
 export default function Profile() {
   const { theme, toggleTheme } = useTheme();
-  const { currentUser } = useAuth();
+//  const { currentUser } = useAuth() as {currentUser: {firstName: string, lastName: string, role: string, email: string}}
 
   // --- States ---
   const [formData, setFormData] = useState({

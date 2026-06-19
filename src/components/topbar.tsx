@@ -9,7 +9,6 @@ import {
   ShieldCheckIcon,
   Cog6ToothIcon,
   CheckIcon,
-  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 interface TopbarProps {

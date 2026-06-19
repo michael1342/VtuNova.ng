@@ -288,9 +288,14 @@ const SecurityScoreRing = ({ score }: { score: number }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+type ThemeContextType = {
+  theme: string;
+  toggleTheme: () => void;
+  setTheme: React.Dispatch<React.SetStateAction<string>>;
+};
 
 export default function Settings() {
-  const { theme, toggleTheme, setTheme } = useTheme();
+  const { theme, toggleTheme, setTheme } = useTheme() as ThemeContextType;
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [settings, setSettings] = useState<SettingsState>({ ...DEFAULT_SETTINGS });
   const [savedSettings, setSavedSettings] = useState<SettingsState>({ ...DEFAULT_SETTINGS });

@@ -1,8 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
-const ThemeContext = createContext(null);
+// const ThemeContext = createContext(null);
+type node = {
+  children: ReactNode
+}
 
-export const ThemeProvider = ({ children }) => {
+type ThemeContextType = {
+  theme: string;
+  toggleTheme: () => void;
+  setTheme: React.Dispatch<React.SetStateAction<string>>;
+};
+
+const ThemeContext = createContext<ThemeContextType | null>(null);
+
+export const ThemeProvider = ({ children }: node) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved;

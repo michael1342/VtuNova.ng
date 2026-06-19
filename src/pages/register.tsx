@@ -39,7 +39,7 @@ const Register = () => {
   const [animateShake, setAnimateShake] = useState(false);
 
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register } = useAuth() as {register: (credentials: { email: string; password?: string; role: string; firstName: string; lastName: string; }) => { success: boolean; error?: string; user?: any };}
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));

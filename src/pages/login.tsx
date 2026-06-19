@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
@@ -29,15 +29,19 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
-  const [showError, setShowError] = useState(false)
+  const [, setShowError] = useState(false)
   const [loading, setLoading] = useState(false);
   const [animateShake, setAnimateShake] = useState(false);
   const [success, setSuccess] = useState('');
 
+  // type LoginType = {
+  //   email: string
+  //   password: string
+  // }
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { login, isAuthenticated } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { login } = useAuth() 
+  const { theme, toggleTheme } = useTheme() as {theme: string, toggleTheme: () => void};
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));

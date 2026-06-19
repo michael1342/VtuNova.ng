@@ -10,7 +10,6 @@ import {
   Cell,
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
@@ -152,7 +151,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 const Dashboard = () => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth() as {currentUser: {firstName: string, lastName: string, role: string, email: string}}
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">

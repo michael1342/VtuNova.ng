@@ -84,12 +84,12 @@ export default function Referrals() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedModalLink, setCopiedModalLink] = useState(false);
-  const [isEmptyState, setIsEmptyState] = useState(false);
+  const [isEmptyState,] = useState(false);
   
   // Wallet Balances
   const [availableEarnings, setAvailableEarnings] = useState(25500);
-  const [totalEarnings, setTotalEarnings] = useState(85000);
-  const [pendingRewards, setPendingRewards] = useState(12500);
+  const [totalEarnings, ] = useState(85000);
+  const [pendingRewards,] = useState(12500);
   
   // Modals
   const [showQrModal, setShowQrModal] = useState(false);

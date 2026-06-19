@@ -34,8 +34,16 @@ import {
   Cog6ToothIcon as Cog6ToothSolidIcon,
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
+import { type ReactNode } from 'react';
 
-const navItems = {
+type NavItem = {
+  path: string;
+  label: string;
+  icon: ReactNode;
+  activeIcon: ReactNode;
+};
+
+const navItems: Record<string, NavItem[]> = {
   user: [
   {
     label: 'Dashboard',
@@ -134,31 +142,39 @@ admin: [
 };
 
 const Sidebar = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [_, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, ] = useState(false);
 
-  const formatRole = (role) =>
-  role
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/[-_]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase();
+  // type roleProp = {
+  //   role: string;
+  // }
 
-  const { currentUser, logout, getInitials } = useAuth();
+  // const formatRole = ({role}: roleProp) =>
+  // role
+  //   .replace(/([a-z])([A-Z])/g, '$1 $2')
+  //   .replace(/[-_]/g, ' ')
+  //   .replace(/\s+/g, ' ')
+  //   .trim()
+  //   .toUpperCase();
+    
+    const { currentUser, logout } = useAuth() as {
+  currentUser: { role?: string } | null;
+  logout: (() => void) | null;
+};
+  // const [currentUser, setCurrentUser] = useState<User | null>(null);
   const navigate = useNavigate()
 
   if (currentUser == null) {
     return ;
   }
 
-  const role = currentUser.role?.toLowerCase().trim() || 'user';
-  const normalizedRole = role.replace(/[\s_-]/g, '');
-  const displayRole = formatRole(role);
+  const newRole = currentUser.role?.toLowerCase().trim() || 'user';
+  // const normalizedRole = newRole.replace(/[\s_-]/g, '');
+  // const displayRole = formatRole(newRole);
 
   const handleLogout = () => {
-    logout()
+    logout?.()
     setMobileMenuOpen?.(false);
     return navigate('/login')
   }
@@ -196,7 +212,7 @@ const Sidebar = () => {
 
       {/* Nav */}
       <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden">
-        {navItems[role]?.map((item) => {
+        {navItems[newRole]?.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link

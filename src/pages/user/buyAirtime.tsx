@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+// import { Link } from 'react-router-dom';
 
 // ─── Network Data ─────────────────────────────────────────────────────────────
 
@@ -48,7 +48,7 @@ const BuyAirtime = () => {
   const [phone, setPhone] = useState('');
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
-  const [showNetworkMenu, setShowNetworkMenu] = useState(false);
+  // const [showNetworkMenu, setShowNetworkMenu] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
