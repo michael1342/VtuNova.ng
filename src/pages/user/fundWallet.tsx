@@ -226,7 +226,7 @@ const FundWallet = () => {
                         <div>
                           <span className="text-[10px] text-text-muted block">Sterling Bank</span>
                           <span className="text-sm font-bold font-mono text-text-white tracking-wider block mt-0.5">8273648190</span>
-                          <span className="text-[10px] text-text-gray block mt-0.5">SwiftTopup - Michael Anazodo</span>
+                          <span className="text-[10px] text-text-gray block mt-0.5">VtuNova - Michael Anazodo</span>
                         </div>
                         <button
                           type="button"
@@ -241,7 +241,7 @@ const FundWallet = () => {
                         <div>
                           <span className="text-[10px] text-text-muted block">Wema Bank</span>
                           <span className="text-sm font-bold font-mono text-text-white tracking-wider block mt-0.5">9928374620</span>
-                          <span className="text-[10px] text-text-gray block mt-0.5">SwiftTopup - Michael Anazodo</span>
+                          <span className="text-[10px] text-text-gray block mt-0.5">VtuNova - Michael Anazodo</span>
                         </div>
                         <button
                           type="button"

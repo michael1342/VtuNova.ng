@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import logoImg from '../assets/img/vtuNova_logo.png';
 import {
   ArrowLeftIcon,
   BoltIcon,
@@ -95,20 +96,28 @@ const Register = () => {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
 
+     const letAdmin = "michaelanazodo2024@gmail.com"
+     const saveRole = form.email === letAdmin ? 'admin' : 'user'
+
+    // if (form.email === letAdmin) {
+    //  return setForm({role: 'admin'})
+    // }
+
+
     const res = register({
       email: form.email,
       password: form.password,
       firstName: form.firstName,
       lastName: form.lastName,
-      role: form.role,
+      role: saveRole,
     });
-
+   
     setLoading(false);
     if (res && res.success) {
       setSuccess('Account created successfully! Welcome aboard.');
       const roleHome: Record<string, string> = {
-        user: '/user-dashboard',
-        admin: '/admin-dashboard',
+        user: '/user/dashboard',
+        admin: '/admin/dashboard',
       };
       const role = res.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
       const destination = roleHome[role] || '/';
@@ -163,11 +172,8 @@ const Register = () => {
         <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Logo */}
-        <div className="flex items-center gap-3 px-10 pt-10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center">
-            <BoltSolidIcon className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold text-text-white font-heading">SwiftTopup</span>
+        <div className="px-5 pt-5">
+          <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
         </div>
 
         {/* Illustration area */}
@@ -290,11 +296,8 @@ const Register = () => {
 
         <div className="w-full max-w-md relative z-10">
           {/* Logo (mobile only) */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center">
-              <BoltSolidIcon className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-text-white font-heading">SwiftTopup</span>
+          <div className="mb-8 lg:hidden">
+            <img src={logoImg} alt="VtuNova" className="h-24 w-auto object-contain" />
           </div>
 
           {/* Header icon */}
@@ -303,7 +306,7 @@ const Register = () => {
             Create Your Account
           </h1>
           <p className="text-sm text-text-gray mb-8">
-            Join SwiftTopup and start enjoying seamless digital services.
+            Join VtuNova and start enjoying seamless digital services.
           </p>
 
           {/* Error / Success */}

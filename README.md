@@ -1,4 +1,4 @@
-# SwiftTopup
+# VtuNova
 VTU company
 
 # React + TypeScript + Vite

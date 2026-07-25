@@ -56,7 +56,7 @@ interface ToastMessage {
 //     id: 'notif-2',
 //     category: 'wallet',
 //     title: 'Wallet Credited',
-//     message: '₦20,000 has been successfully added to your SwiftTopup wallet via Bank Transfer transfer source.',
+//     message: '₦20,000 has been successfully added to your VtuNova wallet via Bank Transfer transfer source.',
 //     time: '8:14 AM',
 //     dateGroup: 'Today',
 //     read: false,
@@ -68,7 +68,7 @@ interface ToastMessage {
 //     id: 'notif-3',
 //     category: 'security',
 //     title: 'New Login Detected',
-//     message: 'Your SwiftTopup account was accessed from a new device (Chrome, Windows) in Lagos, Nigeria. If this was not you, lock your credentials immediately.',
+//     message: 'Your VtuNova account was accessed from a new device (Chrome, Windows) in Lagos, Nigeria. If this was not you, lock your credentials immediately.',
 //     time: '6:32 AM',
 //     dateGroup: 'Today',
 //     read: false,
@@ -596,7 +596,7 @@ export default function Notifications() {
             <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
               <div>
                 <h3 className="text-text-white font-bold text-xs font-['Space_Grotesk']">Quick Links</h3>
-                <p className="text-[10px] text-text-muted mt-0.5">Navigate around SwiftTopup services</p>
+                <p className="text-[10px] text-text-muted mt-0.5">Navigate around VtuNova services</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

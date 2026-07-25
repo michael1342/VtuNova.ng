@@ -20,6 +20,19 @@ import Profile from './pages/user/profile'
 import Settings from './pages/user/settings'
 import Login from './pages/login'
 import Unauthorized from './pages/unauthorized'
+import AdminDashboard from './pages/Admin/dashboard'
+import AdminUserManagement from './pages/Admin/user'
+import AdminTransactions from './pages/Admin/transactions'
+import AdminWalletManagement from './pages/Admin/wallet'
+import AdminAirtimeOrders from './pages/Admin/airtimeOrders'
+import AdminDataOrders from './pages/Admin/dataOrders'
+import AdminElectricityPayments from './pages/Admin/electricityPayments'
+import AdminCableSubscriptions from './pages/Admin/cableSubscriptions'
+import AdminNotifications from './pages/Admin/adminNotifications'
+import AdminReferralManagement from './pages/Admin/referralManagement'
+import AdminAnalytics from './pages/Admin/adminAnalytics'
+import AdminSettings from './pages/Admin/adminSettings'
+import AdminSupport from './pages/Admin/adminSupport'
 import './App.css'
 
 // const {currentUser} = useAuth();
@@ -30,23 +43,23 @@ type ProtectedRouteProps = {
 }
 
 
-const ProtectedRoute = ({ allowedRoles, children}:  ProtectedRouteProps) => {
+const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 
   type CurrentUserProps = {
     role: string;
   }
-  const { currentUser } = useAuth() as {currentUser: CurrentUserProps | null;}
+  const { currentUser } = useAuth() as { currentUser: CurrentUserProps | null; }
 
   if (!currentUser) {
     //  return navigate('/');
     return (
-    <Navigate to="/" replace />
+      <Navigate to="/" replace />
     );
   }
 
   if (!allowedRoles.includes(currentUser.role)) {
     // return navigate('/unauthorized');
-     return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return children;
@@ -67,53 +80,71 @@ function App() {
   return (
     <>
       <AuthProvider>
-      <ThemeProvider>
-      <NotificationProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route element={<MainLayout />}>
-            <Route index path="/user/dashboard" element={<ProtectedRoute allowedRoles={['user']}>
-              <Dashboard />
-            </ProtectedRoute>} />
-            <Route path="/user/buy/airtime" element={<ProtectedRoute allowedRoles={['user']}>
-              <BuyAirtime />
-            </ProtectedRoute>} />
-            <Route path="/user/buy/data" element={<ProtectedRoute allowedRoles={['user']}>
-              <BuyData />
-            </ProtectedRoute>} />
-            <Route path="/user/buy/electricity" element={<ProtectedRoute allowedRoles={['user']}>
-              <BuyElectricity />
-            </ProtectedRoute>} />
-            <Route path="/user/buy/cable" element={<ProtectedRoute allowedRoles={['user']}>
-              <BuyCableSubscription />
-            </ProtectedRoute>} />
-            <Route path="/user/fund" element={<ProtectedRoute allowedRoles={['user']}>
-              <FundWallet />
-            </ProtectedRoute>} />
-            <Route path="/user/transactions" element={<ProtectedRoute allowedRoles={['user']}>
-              <Transactions />
-            </ProtectedRoute>} />
-            <Route path="/user/referrals" element={<ProtectedRoute allowedRoles={['user']}>
-              <Referrals />
-            </ProtectedRoute>} />
-            <Route path="/user/notifications" element={<ProtectedRoute allowedRoles={['user']}>
-              <Notifications />
-            </ProtectedRoute>} />
-            <Route path="/user/profile" element={<ProtectedRoute allowedRoles={['user']}>
-              <Profile />
-            </ProtectedRoute>} />
-            <Route path="/user/settings" element={<ProtectedRoute allowedRoles={['user']}>
-              <Settings />
-            </ProtectedRoute>} />
-          </Route>
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/unauthorized" element={<Unauthorized />} />
-        </Routes>
-      </Router>
-      </NotificationProvider>
-      </ThemeProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <Router>
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route element={<MainLayout />}>
+                  <Route index path="/user/dashboard" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Dashboard />
+                  </ProtectedRoute>} />
+                  <Route path="/user/buy/airtime" element={<ProtectedRoute allowedRoles={['user']}>
+                    <BuyAirtime />
+                  </ProtectedRoute>} />
+                  <Route path="/user/buy/data" element={<ProtectedRoute allowedRoles={['user']}>
+                    <BuyData />
+                  </ProtectedRoute>} />
+                  <Route path="/user/buy/electricity" element={<ProtectedRoute allowedRoles={['user']}>
+                    <BuyElectricity />
+                  </ProtectedRoute>} />
+                  <Route path="/user/buy/cable" element={<ProtectedRoute allowedRoles={['user']}>
+                    <BuyCableSubscription />
+                  </ProtectedRoute>} />
+                  <Route path="/user/fund" element={<ProtectedRoute allowedRoles={['user']}>
+                    <FundWallet />
+                  </ProtectedRoute>} />
+                  <Route path="/user/transactions" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Transactions />
+                  </ProtectedRoute>} />
+                  <Route path="/user/referrals" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Referrals />
+                  </ProtectedRoute>} />
+                  <Route path="/user/notifications" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Notifications />
+                  </ProtectedRoute>} />
+                  <Route path="/user/profile" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Profile />
+                  </ProtectedRoute>} />
+                  <Route path="/user/settings" element={<ProtectedRoute allowedRoles={['user']}>
+                    <Settings />
+                  </ProtectedRoute>} />
+                  <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}>
+                    <AdminDashboard />
+                  </ProtectedRoute>} />
+                  <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}>
+                    <AdminUserManagement />
+                  </ProtectedRoute>} />
+                  <Route path="/admin/transactions" element={<ProtectedRoute allowedRoles={['admin']}><AdminTransactions /></ProtectedRoute>} />
+                  <Route path="/admin/wallet" element={<ProtectedRoute allowedRoles={['admin']}><AdminWalletManagement /></ProtectedRoute>} />
+                  <Route path="/admin/services/airtime" element={<ProtectedRoute allowedRoles={['admin']}><AdminAirtimeOrders /></ProtectedRoute>} />
+                  <Route path="/admin/services/data" element={<ProtectedRoute allowedRoles={['admin']}><AdminDataOrders /></ProtectedRoute>} />
+                  <Route path="/admin/services/electricity" element={<ProtectedRoute allowedRoles={['admin']}><AdminElectricityPayments /></ProtectedRoute>} />
+                  <Route path="/admin/services/cable" element={<ProtectedRoute allowedRoles={['admin']}><AdminCableSubscriptions /></ProtectedRoute>} />
+                  <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
+                  <Route path="/admin/referrals" element={<ProtectedRoute allowedRoles={['admin']}><AdminReferralManagement /></ProtectedRoute>} />
+                  <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['admin']}><AdminAnalytics /></ProtectedRoute>} />
+                  <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
+                  <Route path="/admin/support" element={<ProtectedRoute allowedRoles={['admin']}><AdminSupport /></ProtectedRoute>} />
+                  <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+                </Route>
+                <Route path="/register" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/unauthorized" element={<Unauthorized />} />
+              </Routes>
+            </Router>
+          </NotificationProvider>
+        </ThemeProvider>
       </AuthProvider>
     </>
   )

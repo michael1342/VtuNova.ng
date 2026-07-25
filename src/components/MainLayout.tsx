@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./topbar";
+import BottomNav from "./bottomNav";
 
 const MainLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,9 +26,10 @@ const MainLayout = () => {
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-20 lg:pb-0">
           <Outlet />
         </main>
+        <BottomNav />
       </div>
     </div>
   );

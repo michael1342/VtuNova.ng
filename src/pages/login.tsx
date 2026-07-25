@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import logoImg from '../assets/img/vtuNova_logo.png';
 import {
   ArrowLeftIcon,
   BoltIcon,
@@ -17,8 +18,8 @@ import {
 import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
 
-// console.log(localStorage.getItem('swiftTopup_key'))
-// const fil = localStorage.getItem('swiftTopup_key')
+// console.log(localStorage.getItem('vtuNova_key'))
+// const fil = localStorage.getItem('vtuNova_key')
 // const fin = JSON.parse(fil)
 // const userArray = fin.map(u => u.email)
 // const tostring = userArray.toString()
@@ -40,7 +41,7 @@ const Login = () => {
   // }
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { login } = useAuth() 
+  const { login } = useAuth() as { login: (credentials: { email: string; password?: string }) => { success: boolean; error?: string ; user?: any } };
   const { theme, toggleTheme } = useTheme() as {theme: string, toggleTheme: () => void};
 
   const set = (k: string, v: string) => {
@@ -77,10 +78,11 @@ const Login = () => {
     await new Promise((r) => setTimeout(r, 600));
     const res = login({ email: form.email, password: form.password });
     setLoading(false);
+    // console.log(form.email, form.password)
 
-    if (res.success) {
+    if (res && res.success) {
       setSuccess('Access granted! Redirecting...');
-      const roleHome: Record<string, string> = {
+      const roleHome: /* Record<string, string> */any = {
         user: '/user/dashboard',
         admin: '/admin/dashboard',
       }
@@ -138,11 +140,8 @@ const Login = () => {
         <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Logo */}
-        <div className="flex items-center gap-3 px-10 pt-10">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center">
-            <BoltSolidIcon className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold text-text-white font-heading">SwiftTopup</span>
+        <div className="px-5 pt-5">
+          <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
         </div>
 
         {/* Phone Mockup Area */}
@@ -250,11 +249,8 @@ const Login = () => {
 
         <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center">
-              <BoltSolidIcon className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-text-white font-heading">SwiftTopup</span>
+          <div className="mb-8 lg:hidden">
+            <img src={logoImg} alt="VtuNova" className="h-24 w-auto object-contain" />
           </div>
 
           <h1 className="text-2xl md:text-3xl font-extrabold text-text-white font-heading mb-2">

@@ -1,7 +1,7 @@
 import { createContext, useState, useContext, useCallback, type ReactNode } from "react";
 
-const ACCOUNT_KEY = "swiftTopup_key";
-const SESSION_KEY = "swiftTopup_session";
+const ACCOUNT_KEY = "vtuNova_key";
+const SESSION_KEY = "vtuNova_session";
 
 type stringInfo = {
   id?: string;
@@ -98,11 +98,11 @@ const accounts: stringInfo[] = getAccount();
 
     // ── Login ────────────────────────────────────────────────────────────────────
   const login = useCallback(({ email, password }: { email: string; password?: string }) => {
-    const accounts = getAccount();
+    const accounts: stringInfo[] = getAccount();
     const found    = accounts.find(
       a => a.email.toLowerCase() === email.toLowerCase() && a.password === password
     );
-
+  console.log(accounts)
     if (!found) {
       return { success: false, error: 'Invalid email or password.' };
     }

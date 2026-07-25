@@ -54,19 +54,19 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
     } else if (path.includes('/buy/cable')) {
       return { title: 'Cable TV Subscription', desc: 'Renew your cable subscription' };
     } else if (path.includes('/fund')) {
-      return { title: 'Fund Wallet', desc: 'Add money to your SwiftTopup wallet' };
+      return { title: 'Fund Wallet', desc: 'Add money to your VtuNova wallet' };
     } else if (path.includes('/transactions')) {
       return { title: 'Transactions', desc: 'Track and manage your transaction history' };
     } else if (path.includes('/referrals')) {
-      return { title: 'Referral Program', desc: 'Invite friends to SwiftTopup and earn rewards when they join and transact' };
+      return { title: 'Referral Program', desc: 'Invite friends to VtuNova and earn rewards when they join and transact' };
     } else if (path.includes('/notifications')) {
       return { title: 'Notifications', desc: 'Stay updated with transactions, wallet activity, account alerts, and important updates' };
     } else if (path.includes('/profile')) {
       return { title: 'My Profile', desc: 'Manage your personal information, account details, security settings, and preferences' };
     } else if (path.includes('/settings')) {
-      return { title: 'Settings', desc: 'Customize your SwiftTopup account experience, security, notifications, and preferences' };
+      return { title: 'Settings', desc: 'Customize your VtuNova account experience, security, notifications, and preferences' };
     }
-    return { title: 'SwiftTopup', desc: 'VTU & Financial Services' };
+    return { title: 'VtuNova', desc: 'VTU & Financial Services' };
   };
 
   const { title, desc } = getHeaderDetails();

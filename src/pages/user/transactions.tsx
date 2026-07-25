@@ -504,7 +504,7 @@ const Transactions = () => {
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `SwiftTopup_Transactions_${Date.now()}.csv`;
+                  a.download = `VtuNova_Transactions_${Date.now()}.csv`;
                   a.click();
                 }}
               >
@@ -623,7 +623,7 @@ const Transactions = () => {
                   onClick={handleResetFilters}
                   className="py-2.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-md transition-all"
                 >
-                  Start Using SwiftTopup
+                  Start Using VtuNova
                 </button>
               </div>
             )}
@@ -947,7 +947,7 @@ const Transactions = () => {
               
               {/* Receipt Branding */}
               <div className="text-center space-y-1">
-                <span className="text-lg font-extrabold text-primary font-['Space_Grotesk'] tracking-tight">SwiftTopup</span>
+                <span className="text-lg font-extrabold text-primary font-['Space_Grotesk'] tracking-tight">VtuNova</span>
                 <span className="text-[10px] text-text-muted block uppercase tracking-wider font-semibold">Transaction Receipt</span>
               </div>
 
@@ -988,7 +988,7 @@ const Transactions = () => {
               </div>
 
               <p className="text-[10px] text-text-muted text-center leading-relaxed">
-                Thank you for using SwiftTopup. For support inquiries, contact help@swifttopup.com
+                Thank you for using VtuNova. For support inquiries, contact help@vtunova.com
               </p>
             </div>
 

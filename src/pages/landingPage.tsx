@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/themeContext';
 import { Link } from 'react-router-dom';
+import logoImg from '../assets/img/vtuNova_logo.png';
 
 const LandingPage = () => {
   const { theme, toggleTheme } = useTheme();
@@ -29,9 +30,8 @@ const LandingPage = () => {
       {/* Navigation Header */}
       <header className={`fixed top-0 left-0 right-0 border-b border-border z-[1000] flex items-center transition-all duration-300 ${isScrolled ? 'h-[70px] bg-bg-dark/90 shadow-[0_10px_30px_rgba(0,0,0,0.1)]' : 'h-20 bg-bg-dark/70 backdrop-blur-lg'}`}>
         <div className="max-w-[1200px] w-full mx-auto px-6 flex justify-between items-center">
-          <a href="#" className="flex items-center gap-2.5 font-heading text-[1.4rem] font-bold text-text-white">
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent-purple rounded-lg flex items-center justify-center text-white font-extrabold">S</div>
-            <span>swiftTopup</span>
+          <a href="#" className="flex items-center">
+            <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
           </a>
           <ul className="hidden min-[901px]:flex gap-8 list-none">
             <li><a href="#" className="text-[0.95rem] font-medium text-text-gray hover:text-text-white">Home</a></li>
@@ -180,9 +180,8 @@ const LandingPage = () => {
             {/* Mini Sidebar */}
             <div className="w-[140px] shrink-0 bg-bg-dark-secondary border-r border-border flex flex-col py-3 px-2.5 gap-0.5 hidden min-[500px]:flex">
               {/* Logo */}
-              <div className="flex items-center gap-1.5 px-2 py-2 mb-2">
-                <div className="w-5 h-5 bg-gradient-to-br from-primary to-accent-purple rounded-md flex items-center justify-center text-white text-[0.5rem] font-extrabold">S</div>
-                <span className="text-[0.6rem] font-bold text-text-white font-heading">SwiftTopup</span>
+              <div className="flex items-center px-2 py-2 mb-2">
+                <img src={logoImg} alt="VtuNova" className="h-10 w-auto object-contain" />
               </div>
               
               {/* Nav Items */}
@@ -563,7 +562,7 @@ const LandingPage = () => {
               <div className="w-[140px] h-[25px] bg-zinc-700 dark:bg-zinc-800 absolute top-0 left-1/2 -translate-x-1/2 rounded-b-2xl z-[100]" />
               <div className="grow pt-[30px] px-4 pb-4 flex flex-col gap-4 bg-bg-dark overflow-hidden text-[0.8rem] text-text-gray">
                 <div className="flex justify-between items-center mt-2.5">
-                  <span className="font-heading font-bold text-text-white">swiftTopup</span>
+                  <span className="font-heading font-bold text-text-white">vtuNova</span>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     <div className="w-1 h-1 bg-text-white rounded-full" />
                     <div className="w-1 h-1 bg-text-white rounded-full" />
@@ -692,7 +691,7 @@ const LandingPage = () => {
             <div className="section-tag">TESTIMONIALS</div>
             <h2 className="section-title">Loved by Thousands</h2>
             <p className="section-desc">
-              Hear what startup founders, engineering leads, and payment managers say about SwiftTopup.
+              Hear what startup founders, engineering leads, and payment managers say about VtuNova.
             </p>
           </div>
 
@@ -707,7 +706,7 @@ const LandingPage = () => {
                 ))}
               </div>
               <p className="text-[0.95rem] dark:var(--text-white) leading-[1.6] mb-6 italic">
-                "SwiftTopup has been a absolute game-changer for our finance ledger app. 
+                "VtuNova has been a absolute game-changer for our finance ledger app. 
                 The APIs are consistently responsive and the sandbox let us test critical payouts easily."
               </p>
               <div className="flex items-center gap-3">
@@ -750,7 +749,7 @@ const LandingPage = () => {
                 ))}
               </div>
               <p className="text-[0.95rem]  dark:var(--text-white) leading-[1.6] mb-6 italic">
-                "We migrated all data allocation traffic to SwiftTopup and saw our processing success rates bounce from 89% straight up to 99.9%. Solid infrastructure."
+                "We migrated all data allocation traffic to VtuNova and saw our processing success rates bounce from 89% straight up to 99.9%. Solid infrastructure."
               </p>
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-full overflow-hidden border border-border flex items-center justify-center font-bold text-white text-[0.9rem]" style={{ background: '#ec4899' }}>SL</div>
@@ -934,7 +933,7 @@ const LandingPage = () => {
             <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-1/2 h-[300px] bg-[radial-gradient(circle,rgba(59,130,246,0.1)_0%,transparent_60%)] -z-10 pointer-events-none" />
             <h2 className="text-[2.2rem] md:text-5xl leading-[1.1] mb-4 font-extrabold text-text-white">Start Sending Airtime &amp; Data Today</h2>
             <p className="text-[1.15rem] text-text-gray max-w-[600px] mx-auto mb-9 leading-[1.6]">
-              Join thousands of fast-growing applications and users using SwiftTopup to run automated utility payouts.
+              Join thousands of fast-growing applications and users using VtuNova to run automated utility payouts.
             </p>
             <div className="flex flex-col min-[481px]:flex-row justify-center gap-4 min-[481px]:items-center max-[480px]:px-5">
               <button className="bg-primary text-white text-[0.95rem] font-semibold px-[22px] py-[10px] rounded-lg shadow-[0_4px_14px_rgba(59,130,246,0.4)] hover:bg-primary-hover hover:-translate-y-[1px] hover:shadow-[0_6px_20px_rgba(59,130,246,0.5)] transition-all duration-200">Create Your Account</button>
@@ -949,9 +948,8 @@ const LandingPage = () => {
         <div className="max-w-[1200px] w-full mx-auto px-6">
           <div className="grid grid-cols-1 min-[481px]:grid-cols-2 min-[901px]:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10 min-[901px]:gap-[60px] mb-15">
             <div className="flex flex-col items-start gap-4">
-              <a href="#" className="flex items-center gap-2.5 font-heading text-[1.4rem] font-bold text-white">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary to-accent-purple rounded-lg flex items-center justify-center text-white font-extrabold">S</div>
-                <span>swifttopup</span>
+              <a href="#" className="flex items-center">
+                <img src={logoImg} alt="VtuNova" className="h-30 w-auto object-contain" />
               </a>
               <p className="text-text-gray leading-[1.6] max-w-[320px]">
                 Automated airtime distribution, data packet provisioning, and utility meter bill payments for users.
@@ -1004,7 +1002,7 @@ const LandingPage = () => {
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
                   <polyline points="22,6 12,13 2,6"></polyline>
                 </svg>
-                <span>support@swifttopup.com</span>
+                <span>support@vtunova.com</span>
               </div>
               <div className="flex items-start gap-2.5 text-text-gray mb-3 leading-[1.4]">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-primary shrink-0 mt-1">
@@ -1017,7 +1015,7 @@ const LandingPage = () => {
           </div>
 
           <div className="border-t border-border pt-10 flex flex-col md:flex-row justify-between items-center text-text-muted text-[0.8rem] gap-5 md:gap-0 text-center md:text-left">
-            <span>&copy; 2026 SwiftTopup Inc. All rights reserved.</span>
+            <span>&copy; 2026 VtuNova Inc. All rights reserved.</span>
             <div className="flex gap-6">
               <a href="#" className="hover:text-white transition-colors duration-200">Privacy Policy</a>
               <a href="#" className="hover:text-white transition-colors duration-200">Terms of Service</a>

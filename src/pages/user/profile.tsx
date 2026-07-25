@@ -96,7 +96,7 @@ export default function Profile() {
 
   // Mock Variables
   const referralCode = 'SWT-MICHAEL-248';
-  const referralLink = `https://swifttopup.com/ref/${referralCode}`;
+  const referralLink = `https://vtunova.com/ref/${referralCode}`;
   
   const [activities, setActivities] = useState<ActivityEvent[]>([
     { id: 'act-1', type: 'profile', description: 'Profile information updated successfully.', time: '10 mins ago' },

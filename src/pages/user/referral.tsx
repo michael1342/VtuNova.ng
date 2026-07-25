@@ -120,7 +120,7 @@ export default function Referrals() {
   const itemsPerPage = 5;
 
   const referralCode = 'SWT-MICHAEL-248';
-  const referralLink = `https://swifttopup.com/ref/${referralCode}`;
+  const referralLink = `https://vtunova.com/ref/${referralCode}`;
 
   // --- Helpers ---
   const handleCopy = (text: string, type: 'code' | 'link' | 'modalLink') => {
@@ -189,7 +189,7 @@ export default function Referrals() {
 
   const handleShare = (platform: string) => {
     let url = '';
-    const shareText = `Hey! Sign up on SwiftTopup using my referral link to get airtime, data and electricity bills discount instantly: ${referralLink}`;
+    const shareText = `Hey! Sign up on VtuNova using my referral link to get airtime, data and electricity bills discount instantly: ${referralLink}`;
     
     if (platform === 'whatsapp') {
       url = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
@@ -258,7 +258,7 @@ export default function Referrals() {
               Referral Program
             </h2>
             <p className="text-sm text-text-muted mt-1">
-              Invite friends to SwiftTopup and earn rewards when they join and transact.
+              Invite friends to VtuNova and earn rewards when they join and transact.
             </p>
           </div>
           {/* Trust Badges */}
@@ -938,7 +938,7 @@ export default function Referrals() {
               </div>
               <ul className="space-y-1.5 text-[11px] text-text-muted list-disc pl-4 leading-relaxed">
                 <li>Share with friends who actively buy airtime, data or pay utility bills.</li>
-                <li>Write a short tutorial explaining the 1.5% cashback benefits of SwiftTopup.</li>
+                <li>Write a short tutorial explaining the 1.5% cashback benefits of VtuNova.</li>
                 <li>Payouts are disbursed instantly once qualifications are confirmed.</li>
               </ul>
             </div>

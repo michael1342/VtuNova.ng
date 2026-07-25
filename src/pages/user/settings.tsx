@@ -816,7 +816,7 @@ export default function Settings() {
               />
               <ToggleRow
                 title="Analytics Tracking"
-                description="Help improve SwiftTopup with usage analytics"
+                description="Help improve VtuNova with usage analytics"
                 enabled={settings.analyticsTracking}
                 onToggle={() => toggleSetting('analyticsTracking')}
               />
@@ -972,7 +972,7 @@ export default function Settings() {
           <div>
             <h2 className="text-2xl font-bold text-text-white font-['Space_Grotesk'] leading-tight">Settings</h2>
             <p className="text-sm text-text-muted mt-1">
-              Customize your SwiftTopup account experience, security, notifications, and preferences.
+              Customize your VtuNova account experience, security, notifications, and preferences.
             </p>
           </div>
           <div className="grid grid-cols-2 sm:flex items-center gap-x-4 gap-y-2 text-xs font-semibold text-blue-500 bg-blue-500/5 border border-blue-500/10 rounded-xl p-3">
@@ -1055,7 +1055,7 @@ export default function Settings() {
             {/* Appearance Card */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300">
               <h3 className="text-text-white font-bold text-xs font-['Space_Grotesk'] mb-1">Appearance</h3>
-              <p className="text-[10px] text-text-muted mb-4">Customize how SwiftTopup looks</p>
+              <p className="text-[10px] text-text-muted mb-4">Customize how VtuNova looks</p>
 
               <div className="space-y-3">
                 <button
