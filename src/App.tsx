@@ -48,7 +48,7 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
   type CurrentUserProps = {
     role: string;
   }
-  const { currentUser } = useAuth() as { currentUser: CurrentUserProps | null; }
+  const { currentUser } = useAuth()
 
   if (!currentUser) {
     //  return navigate('/');
@@ -59,7 +59,7 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 
   if (!allowedRoles.includes(currentUser.role)) {
     // return navigate('/unauthorized');
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return children;

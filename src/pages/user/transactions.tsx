@@ -1,4 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { totalTransactions, totalSuccessfulTransactions, totalAmountSpent, totalAmountReceived } from '../../utils/transactions';
+import { formatAmount, formatId, formatDate } from '../../utils/formatter';
+import { getTransactions } from '../../api/user';
+import { useAuth } from '../../context/AuthContext';
+const transaction = await getTransactions()
 
 
 
@@ -19,121 +24,123 @@ interface Transaction {
   balanceAfter: number;
 }
 
+const initialTransactions = transaction.transactions
+
 // Initial Data representing realistic logs
-const initialTransactions: Transaction[] = [
-  {
-    id: 'SWT-2026-00124',
-    refNo: 'TXN9283749201',
-    service: 'Airtime',
-    recipient: '08012345678',
-    amount: 1000,
-    fee: 0,
-    status: 'Success',
-    date: '12 Jun 2026',
-    time: '10:24 AM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 151000,
-    balanceAfter: 150000,
-  },
-  {
-    id: 'SWT-2026-00125',
-    refNo: 'TXN8374829103',
-    service: 'Electricity',
-    recipient: 'Meter 123456789',
-    amount: 5000,
-    fee: 100,
-    status: 'Pending',
-    date: '12 Jun 2026',
-    time: '09:15 AM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 156100,
-    balanceAfter: 151000,
-  },
-  {
-    id: 'SWT-2026-00126',
-    refNo: 'TXN3748291034',
-    service: 'Cable TV',
-    recipient: 'DSTV 1234567890',
-    amount: 7500,
-    fee: 0,
-    status: 'Success',
-    date: '11 Jun 2026',
-    time: '01:20 PM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 163600,
-    balanceAfter: 156100,
-  },
-  {
-    id: 'SWT-2026-00127',
-    refNo: 'TXN2837482910',
-    service: 'Wallet Funding',
-    recipient: 'Wallet Balance',
-    amount: 15000,
-    fee: 0,
-    status: 'Success',
-    date: '11 Jun 2026',
-    time: '10:42 AM',
-    paymentMethod: 'Bank Transfer (Sterling)',
-    balanceBefore: 148600,
-    balanceAfter: 163600,
-  },
-  {
-    id: 'SWT-2026-00128',
-    refNo: 'TXN1928374810',
-    service: 'Data',
-    recipient: '09011951195',
-    amount: 2000,
-    fee: 0,
-    status: 'Success',
-    date: '10 Jun 2026',
-    time: '06:12 PM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 150600,
-    balanceAfter: 148600,
-  },
-  {
-    id: 'SWT-2026-00129',
-    refNo: 'TXN0928374819',
-    service: 'Airtime',
-    recipient: '08108642864',
-    amount: 500,
-    fee: 0,
-    status: 'Failed',
-    date: '09 Jun 2026',
-    time: '08:30 AM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 150600,
-    balanceAfter: 150600,
-  },
-  {
-    id: 'SWT-2026-00130',
-    refNo: 'TXN9182736450',
-    service: 'Wallet Funding',
-    recipient: 'Wallet Balance',
-    amount: 5000,
-    fee: 0,
-    status: 'Success',
-    date: '08 Jun 2026',
-    time: '04:15 PM',
-    paymentMethod: 'Card (Mastercard)',
-    balanceBefore: 145600,
-    balanceAfter: 150600,
-  },
-  {
-    id: 'SWT-2026-00131',
-    refNo: 'TXN8172635449',
-    service: 'Electricity',
-    recipient: 'Meter 109876543',
-    amount: 10000,
-    fee: 100,
-    status: 'Reversed',
-    date: '07 Jun 2026',
-    time: '11:05 AM',
-    paymentMethod: 'Wallet Balance',
-    balanceBefore: 145600,
-    balanceAfter: 145600,
-  },
-];
+// const initialTransactions: Transaction[] = [
+//   {
+//     id: 'SWT-2026-00124',
+//     refNo: 'TXN9283749201',
+//     service: 'Airtime',
+//     recipient: '08012345678',
+//     amount: 1000,
+//     fee: 0,
+//     status: 'Success',
+//     date: '12 Jun 2026',
+//     time: '10:24 AM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 151000,
+//     balanceAfter: 150000,
+//   },
+//   {
+//     id: 'SWT-2026-00125',
+//     refNo: 'TXN8374829103',
+//     service: 'Electricity',
+//     recipient: 'Meter 123456789',
+//     amount: 5000,
+//     fee: 100,
+//     status: 'Pending',
+//     date: '12 Jun 2026',
+//     time: '09:15 AM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 156100,
+//     balanceAfter: 151000,
+//   },
+//   {
+//     id: 'SWT-2026-00126',
+//     refNo: 'TXN3748291034',
+//     service: 'Cable TV',
+//     recipient: 'DSTV 1234567890',
+//     amount: 7500,
+//     fee: 0,
+//     status: 'Success',
+//     date: '11 Jun 2026',
+//     time: '01:20 PM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 163600,
+//     balanceAfter: 156100,
+//   },
+//   {
+//     id: 'SWT-2026-00127',
+//     refNo: 'TXN2837482910',
+//     service: 'Wallet Funding',
+//     recipient: 'Wallet Balance',
+//     amount: 15000,
+//     fee: 0,
+//     status: 'Success',
+//     date: '11 Jun 2026',
+//     time: '10:42 AM',
+//     paymentMethod: 'Bank Transfer (Sterling)',
+//     balanceBefore: 148600,
+//     balanceAfter: 163600,
+//   },
+//   {
+//     id: 'SWT-2026-00128',
+//     refNo: 'TXN1928374810',
+//     service: 'Data',
+//     recipient: '09011951195',
+//     amount: 2000,
+//     fee: 0,
+//     status: 'Success',
+//     date: '10 Jun 2026',
+//     time: '06:12 PM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 150600,
+//     balanceAfter: 148600,
+//   },
+//   {
+//     id: 'SWT-2026-00129',
+//     refNo: 'TXN0928374819',
+//     service: 'Airtime',
+//     recipient: '08108642864',
+//     amount: 500,
+//     fee: 0,
+//     status: 'Failed',
+//     date: '09 Jun 2026',
+//     time: '08:30 AM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 150600,
+//     balanceAfter: 150600,
+//   },
+//   {
+//     id: 'SWT-2026-00130',
+//     refNo: 'TXN9182736450',
+//     service: 'Wallet Funding',
+//     recipient: 'Wallet Balance',
+//     amount: 5000,
+//     fee: 0,
+//     status: 'Success',
+//     date: '08 Jun 2026',
+//     time: '04:15 PM',
+//     paymentMethod: 'Card (Mastercard)',
+//     balanceBefore: 145600,
+//     balanceAfter: 150600,
+//   },
+//   {
+//     id: 'SWT-2026-00131',
+//     refNo: 'TXN8172635449',
+//     service: 'Electricity',
+//     recipient: 'Meter 109876543',
+//     amount: 10000,
+//     fee: 100,
+//     status: 'Reversed',
+//     date: '07 Jun 2026',
+//     time: '11:05 AM',
+//     paymentMethod: 'Wallet Balance',
+//     balanceBefore: 145600,
+//     balanceAfter: 145600,
+//   },
+// ];
 
 const Transactions = () => {
   // Filters State
@@ -178,9 +185,9 @@ const Transactions = () => {
     return initialTransactions.filter((txn) => {
       // Search Match
       const matchesSearch =
-        txn.id.toLowerCase().includes(search.toLowerCase()) ||
-        txn.recipient.toLowerCase().includes(search.toLowerCase()) ||
-        txn.refNo.toLowerCase().includes(search.toLowerCase());
+        txn._id?.toLowerCase().includes(search.toLowerCase()) ||
+        txn.recipient?.toLowerCase().includes(search.toLowerCase()) ||
+        txn.refNo?.toLowerCase().includes(search.toLowerCase());
 
       // Type Match
       const matchesType =
@@ -206,8 +213,8 @@ const Transactions = () => {
       }
       // Date sort (simple lexicographical for demo logs)
       return sortOrder === 'asc'
-        ? a.id.localeCompare(b.id)
-        : b.id.localeCompare(a.id);
+        ? a._id?.localeCompare(b.id)
+        : b._id?.localeCompare(a.id);
     });
   }, [filteredTransactions, sortBy, sortOrder]);
 
@@ -255,6 +262,7 @@ const Transactions = () => {
     setShowReceipt(true);
   };
 
+  
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray transition-colors font-sans">
 
@@ -290,7 +298,7 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">1,284</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalTransactions(), false)}</span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
                 <span>+12.4%</span>
                 <span className="text-text-muted font-normal">this month</span>
@@ -315,7 +323,7 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">₦485,000</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalAmountSpent(), true)}</span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
                 <span>+8.2%</span>
                 <span className="text-text-muted font-normal">vs last month</span>
@@ -340,7 +348,7 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">1,230</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalSuccessfulTransactions(), false)}</span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
                 <span>98.6%</span>
                 <span className="text-text-muted font-normal">Success Rate</span>
@@ -365,7 +373,7 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">₦620,000</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalAmountReceived(), true)}</span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
                 <span>+15.7%</span>
                 <span className="text-text-muted font-normal">this month</span>
@@ -567,20 +575,20 @@ const Transactions = () => {
                           className="rounded border-border text-primary focus:ring-primary cursor-pointer"
                         />
                       </td>
-                      <td className="p-4 font-bold text-text-white">{txn.id}</td>
+                      <td className="p-4 font-bold text-text-white">{formatId(txn._id)}</td>
                       <td className="p-4 font-semibold text-text-gray">{txn.service}</td>
-                      <td className="p-4 text-text-muted font-medium">{txn.recipient}</td>
+                      <td className="p-4 text-text-muted font-medium">{txn.recipient ?? 'N/A'}</td>
                       <td className="p-4 font-extrabold text-text-white font-['Space_Grotesk']">
-                        ₦{txn.amount.toLocaleString()}
+                        {formatAmount(txn.amount.toLocaleString(), true)}
                       </td>
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            txn.status === 'Success'
+                            txn.status === 'success'
                               ? 'bg-accent-green-glow border-accent-green text-accent-green'
-                              : txn.status === 'Pending'
+                              : txn.status === 'pending'
                               ? 'bg-accent-orange-glow border-accent-orange text-accent-orange'
-                              : txn.status === 'Failed'
+                              : txn.status === 'failed'
                               ? 'bg-red-50 border-red-200 text-red-500'
                               : 'bg-bg-dark border-border text-text-muted'
                           }`}
@@ -589,7 +597,7 @@ const Transactions = () => {
                         </span>
                       </td>
                       <td className="p-4 text-text-muted font-medium">
-                        {txn.date} <span className="text-[10px] opacity-75 ml-1">{txn.time}</span>
+                        <span className="text-[10px] opacity-75 ml-1">{formatDate(txn.paidAt)} </span>
                       </td>
                       <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -856,7 +864,7 @@ const Transactions = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-text-muted">Transaction ID</span>
-                        <span className="font-mono font-bold text-text-white">{activeTransaction.id}</span>
+                        <span className="font-mono font-bold text-text-white">{formatId(activeTransaction._id)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Reference Number</span>
@@ -864,7 +872,14 @@ const Transactions = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Date & Time</span>
-                        <span className="font-semibold text-text-white">{activeTransaction.date} • {activeTransaction.time}</span>
+                        <span className="font-semibold text-text-white">{new Date(activeTransaction.paidAt).toLocaleDateString("en-NG", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+})} • {new Date(activeTransaction.paidAt).toLocaleTimeString("en-NG", {
+  hour: "2-digit",
+  minute: "2-digit",
+})}</span>
                       </div>
                     </div>
                   </div>
@@ -887,7 +902,7 @@ const Transactions = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Service Fee</span>
-                        <span className="font-medium text-text-gray">₦{activeTransaction.fee.toLocaleString()}.00</span>
+                        <span className="font-medium text-text-gray">₦{activeTransaction.fee}.00</span>
                       </div>
                     </div>
                   </div>
@@ -902,11 +917,11 @@ const Transactions = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Wallet Balance Before</span>
-                        <span className="font-medium text-text-gray">₦{activeTransaction.balanceBefore.toLocaleString()}.00</span>
+                        <span className="font-medium text-text-gray">₦{activeTransaction.balanceBefore}.00</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Wallet Balance After</span>
-                        <span className="font-bold text-text-white">₦{activeTransaction.balanceAfter.toLocaleString()}.00</span>
+                        <span className="font-bold text-text-white">₦{activeTransaction.balanceAfter}.00</span>
                       </div>
                     </div>
                   </div>
@@ -937,84 +952,99 @@ const Transactions = () => {
       )}
 
       {/* ── Download Receipt Modal ── */}
-      {showReceipt && receiptTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-bg-dark-secondary/60 backdrop-blur-sm" onClick={() => setShowReceipt(false)} />
-          
-          <div className="bg-bg-card border border-border rounded-2xl max-w-sm w-full shadow-2xl relative overflow-hidden animate-[fadeIn_.2s_ease]">
-            {/* Modal content area */}
-            <div className="p-6 space-y-6 text-xs text-text-gray">
-              
-              {/* Receipt Branding */}
-              <div className="text-center space-y-1">
-                <span className="text-lg font-extrabold text-primary font-['Space_Grotesk'] tracking-tight">VtuNova</span>
-                <span className="text-[10px] text-text-muted block uppercase tracking-wider font-semibold">Transaction Receipt</span>
-              </div>
+     {showReceipt && activeTransaction && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      className="absolute inset-0 bg-bg-dark-secondary/60 backdrop-blur-sm"
+      onClick={() => setShowReceipt(false)}
+    />
 
-              {/* Receipt details */}
-              <div className="border-y border-dashed border-border py-4 space-y-2.5">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Transaction ID</span>
-                  <span className="font-mono font-bold text-text-white">{receiptTransaction.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Reference Number</span>
-                  <span className="font-mono text-text-gray">{receiptTransaction.refNo}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Service</span>
-                  <span className="font-bold text-text-white">{receiptTransaction.service}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Recipient</span>
-                  <span className="font-medium text-text-white">{receiptTransaction.recipient}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Date & Time</span>
-                  <span className="font-semibold text-text-white">{receiptTransaction.date} • {receiptTransaction.time}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Status</span>
-                  <span className="font-bold text-accent-green">{receiptTransaction.status}</span>
-                </div>
-              </div>
+    <div className="bg-bg-card border border-border rounded-2xl max-w-sm w-full shadow-2xl relative overflow-hidden animate-[fadeIn_.2s_ease]">
+      <div className="p-6 space-y-6 text-xs text-text-gray">
 
-              {/* Total amount bar */}
-              <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 flex justify-between items-center">
-                <span className="text-text-muted font-bold uppercase tracking-wider text-[10px]">Total Paid</span>
-                <span className="text-lg font-extrabold text-text-white font-['Space_Grotesk']">
-                  ₦{(receiptTransaction.amount + receiptTransaction.fee).toLocaleString()}.00
-                </span>
-              </div>
+        {/* Receipt Branding */}
+        <div className="text-center space-y-1">
+          <span className="text-lg font-extrabold text-primary font-['Space_Grotesk'] tracking-tight">
+            VtuNova
+          </span>
+          <span className="text-[10px] text-text-muted block uppercase tracking-wider font-semibold">
+            Transaction Receipt
+          </span>
+        </div>
 
-              <p className="text-[10px] text-text-muted text-center leading-relaxed">
-                Thank you for using VtuNova. For support inquiries, contact help@vtunova.com
-              </p>
-            </div>
+        {/* Receipt Details */}
+        <div className="border-y border-dashed border-border py-4 space-y-2.5">
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Transaction ID</span>
+            <span className="font-mono font-bold text-text-white">
+              {formatId(activeTransaction._id)}
+            </span>
+          </div>
 
-            {/* Modal Footer actions */}
-            <div className="px-5 py-4 border-t border-border bg-bg-dark-secondary flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  alert('Receipt downloaded successfully!');
-                  setShowReceipt(false);
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold text-xs shadow-sm transition-colors text-center"
-              >
-                Download PDF
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowReceipt(false)}
-                className="px-4 py-2.5 rounded-xl border border-border bg-bg-card hover:bg-bg-card-hover text-text-gray font-semibold text-xs transition-colors text-center"
-              >
-                Close
-              </button>
-            </div>
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Reference Number</span>
+            <span className="font-mono text-text-gray">
+              {activeTransaction.refNo}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Service</span>
+            <span className="font-bold text-text-white">
+              {activeTransaction.service}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Recipient</span>
+            <span className="font-medium text-text-white">
+              {activeTransaction.recipient}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Date & Time</span>
+            <span className="font-semibold text-text-white">
+              {new Date(activeTransaction.paidAt).toLocaleDateString("en-NG", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+              {" • "}
+              {new Date(activeTransaction.paidAt).toLocaleTimeString("en-NG", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+
+          <div className="flex justify-between gap-4">
+            <span className="text-text-muted">Status</span>
+            <span className="font-bold text-accent-green">
+              {activeTransaction.status}
+            </span>
           </div>
         </div>
-      )}
+
+        {/* Total */}
+        <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 flex justify-between items-center">
+          <span className="text-text-muted font-bold uppercase tracking-wider text-[10px]">
+            Total Paid
+          </span>
+
+          <span className="text-lg font-extrabold text-text-white font-['Space_Grotesk']">
+            ₦{activeTransaction.amount.toLocaleString()}
+          </span>
+        </div>
+
+        <p className="text-[10px] text-text-muted text-center leading-relaxed">
+          Thank you for using VtuNova. For support inquiries, contact
+          help@vtunova.com
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
     </div>
   );

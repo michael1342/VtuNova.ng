@@ -1,59 +1,193 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { formatAmount, formatDate, formatId } from '../../utils/formatter';
+import { getTransactions } from '../../api/user';
+import { verifyMeter, buyElectricity } from '../../api/vtuApi';
+import { useNavigate } from 'react-router-dom';
+import generateRequestID from '../../utils/generateRequestID';
+
 
 const discos = [
-  { id: 'ikeja', name: 'Ikeja Electric (IKEDC)' },
-  { id: 'eko', name: 'Eko Electric (EKEDC)' },
-  { id: 'abuja', name: 'Abuja Electric (AEDC)' },
-  { id: 'kano', name: 'Kano Electric (KEDCO)' },
-  { id: 'portharcourt', name: 'Port Harcourt Electric (PHED)' },
-  { id: 'kaduna', name: 'Kaduna Electric (KAEDCO)' },
-  { id: 'enugu', name: 'Enugu Electric (EEDC)' },
-  { id: 'ibadan', name: 'Ibadan Electric (IBEDC)' },
-  { id: 'jos', name: 'Jos Electric (JED)' },
-  { id: 'yola', name: 'Yola Electric (YEDC)' },
-  { id: 'benin', name: 'Benin Electric (BEDC)' },
+  { id: 'ikeja-electric', name: 'Ikeja Electric (IKEDC)' },
+  { id: 'eko-electric', name: 'Eko Electric (EKEDC)' },
+  { id: 'abuja-electric', name: 'Abuja Electric (AEDC)' },
+  { id: 'kano-electric', name: 'Kano Electric (KEDCO)' },
+  { id: 'portharcourt-electric', name: 'Port Harcourt Electric (PHED)' },
+  { id: 'kaduna-electric', name: 'Kaduna Electric (KAEDCO)' },
+  { id: 'enugu-electric', name: 'Enugu Electric (EEDC)' },
+  { id: 'ibadan-electric', name: 'Ibadan Electric (IBEDC)' },
+  { id: 'jos-electric', name: 'Jos Electric (JED)' },
+  { id: 'yola-electric', name: 'Yola Electric (YEDC)' },
+  { id: 'benin-electric', name: 'Benin Electric (BEDC)' },
 ];
 
 const presetAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
 const BuyElectricity = () => {
+  const navigate = useNavigate();
   const [selectedDisco, setSelectedDisco] = useState('');
-  const [meterType, setMeterType] = useState<'prepaid' | 'postpaid'>('prepaid');
+  const [meterType, setMeterType] = useState<'prepaid' | 'Postpaid'>('prepaid');
   const [meterNumber, setMeterNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  
+  const { currentUser, accountBalance, setAccountBalance } = useAuth();
+
   const [amountType, setAmountType] = useState('preset');
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tokenGenerated, setTokenGenerated] = useState('');
+  const [tokenCopied, setTokenCopied] = useState(false);
+
+  // ── Transaction state ────────────────────────────────────────────────────────
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [txSearch, setTxSearch] = useState('');
+  const [txPage, setTxPage] = useState(1);
+  const TX_PER_PAGE = 5;
 
   const activeAmount = amountType === 'custom' ? (customAmount ? Number(customAmount) : 0) : (selectedAmount ?? 0);
-  const serviceFee = activeAmount > 0 ? 100 : 0;
-  const vat = activeAmount > 0 ? 15 : 0;
-  const totalDebit = activeAmount > 0 ? activeAmount + serviceFee + vat : 0;
 
+  const [customerName, setCustomerName] = useState('');
+  const [address, setAddress] = useState('');
+  const [minPurchaseAmount, setMinPurchaseAmount] = useState('');
+  const [minimumAmount, setMinimumAmount] = useState('');
+  const [wrongBillersCode, setWrongBillersCode] = useState(false);
+  const [commissionDetails, setCommissionDetails] = useState({ amount: null, rate: '1.50', rate_type: 'percent', computation_type: 'default' });
+
+  // Fetch transactions on mount
   useEffect(() => {
-    if (meterNumber.trim().length >= 10 && selectedDisco) {
-      setIsVerifying(true);
-      setIsVerified(false);
-      const timer = setTimeout(() => {
+    const fetchTxns = async () => {
+      try {
+        const res = await getTransactions();
+        setAllTransactions(res?.transactions ?? []);
+      } catch (err) {
+        console.error('Failed to fetch transactions', err);
+      }
+    };
+    fetchTxns();
+  }, []);
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  
+    useEffect(() => {
+      const handleScroll = () => {
+        if (window.scrollY > 20) {
+          setIsScrolled(true);
+        } else {
+          setIsScrolled(false);
+        }
+      };
+      window.addEventListener('scroll', handleScroll);
+      return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+
+    //scroll to top
+    const pageRef = useRef<HTMLDivElement>(null);
+
+const scrollToTop = () => {
+  pageRef.current?.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+};
+
+  // Derived: electricity-only transactions
+  const electricityTransactions = allTransactions.filter(
+    (tx) => tx.service?.toLowerCase() === 'electricity bill'
+  );
+
+  // Filtered by search
+  const filteredElectricityTx = electricityTransactions.filter((tx) => {
+    const q = txSearch.toLowerCase();
+    return (
+      !q ||
+      tx._id?.toLowerCase().includes(q) ||
+      tx.recipient?.toLowerCase().includes(q) ||
+      tx.refNo?.toLowerCase().includes(q)
+    );
+  });
+
+  const totalTxPages = Math.ceil(filteredElectricityTx.length / TX_PER_PAGE);
+  const paginatedElectricityTx = filteredElectricityTx.slice(
+    (txPage - 1) * TX_PER_PAGE,
+    txPage * TX_PER_PAGE
+  );
+
+  // Derived stats
+  const todayTransactions = allTransactions.filter((tx) => {
+    const paidAt = new Date(tx.paidAt);
+    const today = new Date();
+    return (
+      paidAt.getFullYear() === today.getFullYear() &&
+      paidAt.getMonth() === today.getMonth() &&
+      paidAt.getDate() === today.getDate()
+    );
+  });
+
+  const getTodaysTransactionAmount = () =>
+    todayTransactions.reduce((total: number, tx: any) => total + tx.amount, 0);
+
+  const getTotalTransactionAmount = () =>
+    allTransactions.reduce((total: number, tx: any) => total + tx.amount, 0);
+  useEffect(() => {
+    const verifyMeterNumber = async () => {
+  
+
+      if (meterNumber.trim().length >= 10 && selectedDisco) {
+        setIsVerifying(true);
+        setIsVerified(false);
+        try {
+          const response = await verifyMeter({ billersCode: meterNumber, serviceID: selectedDisco, type: meterType });
+          console.log(response);
+          if (response?.success) {
+            setIsVerified(true);
+            setIsVerifying(false);
+            setErrorMessage(null);
+            setCustomerName(response.response.Vtu.content?.Customer_Name)
+            setAddress(response.response.Vtu.content?.Address)
+          } else {
+            setIsVerified(false);
+            setIsVerifying(false);
+            setErrorMessage(response?.error || response?.response.message || 'Meter number could not be verified. Please check and try again.');
+            setSuccess(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        } catch (err: any) {
+          console.log(err);
+          setIsVerified(false);
+          setIsVerifying(false);
+          setErrorMessage(err?.message || 'Failed to verify meter. Please check your connection and try again.');
+          setSuccess(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      } else {
+        // User is still typing or cleared the field — reset silently
+        setIsVerified(false);
         setIsVerifying(false);
-        setIsVerified(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else {
-      setIsVerified(false);
-      setIsVerifying(false);
-    }
+        setErrorMessage(null);
+      }
+    };
+    verifyMeterNumber();
   }, [meterNumber, selectedDisco]);
+
+  const triggerError = (msg: string) => {
+    setErrorMessage(msg);
+    setSuccess(false);
+    scrollToTop()
+  };
+
+  const clearMessages = () => {
+    setErrorMessage(null);
+    setSuccess(false);
+  };
 
   const handleReset = () => {
     setSelectedDisco('');
-    setMeterType('prepaid');
+    setMeterType('');
     setMeterNumber('');
     setAmountType('preset');
     setSelectedAmount(null);
@@ -61,23 +195,88 @@ const BuyElectricity = () => {
     setIsVerified(false);
     setIsVerifying(false);
     setSuccess(false);
+    setErrorMessage(null);
     setTokenGenerated('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDisco || !meterNumber || activeAmount <= 0 || !isVerified) return;
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 2000));
-    setLoading(false);
-    setSuccess(true);
+    clearMessages();
+
+    if (!selectedDisco) {
+      triggerError('Please select a distribution company (DisCo).');
+      return;
+    }
+    if (!meterNumber || meterNumber.trim().length < 10) {
+      triggerError('Please enter a valid meter number (at least 10 digits).');
+      return;
+    }
+    if (!isVerified) {
+      triggerError('Meter number could not be verified. Please check and try again.');
+      return;
+    }
+    if (activeAmount <= 0) {
+      triggerError('Please select or enter a valid payment amount.');
+      return;
+    }
+    // ── Balance check ───────────────────────────────────────────────────────────
+    if (accountBalance !== null && accountBalance < activeAmount) {
+      triggerError(
+        `Insufficient wallet balance. Your balance is ₦${(accountBalance ?? 0).toLocaleString()} but the transaction requires ₦${activeAmount.toLocaleString()}. Please fund your wallet and try again.`
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await buyElectricity({
+        serviceID: selectedDisco,
+        variation_code: meterType,
+        billersCode: meterNumber,
+        amount: activeAmount,
+        phone: '09033149582',
+        request_id: generateRequestID()
+      });
+      console.log(res);
+      if (res?.success) {
+        window.scrollTo({
+  top: 0,
+  behavior: "smooth",
+});
+        setLoading(false);
+        setSuccess(true);
+        setErrorMessage(null);
+       const token = res?.response?.Vtu?.purchased_code
+          console.log(res)
+          setAccountBalance(Math.max(0, accountBalance - activeAmount));
+      //  if (token) return 
+      // const rawToken = "Toke-n : -2636-2054-4059-8275-7802";
+      scrollToTop();
+if(token) {
+  const formattedToken = token
+  .replace("Token : ", "")
+  .replace(/-/g, "")
+  .match(/.{1,4}/g)
+  ?.join("-");
+  console.log(formattedToken);
+   setTokenGenerated(formattedToken)
+}
+
+
+
+// 2636 2054 4059 8275 7802
+// const formattedToken = token.match(/.{1,4}/g).slice(0, 8).join("-");
+// console.log(formattedToken)
     
-    if (meterType === 'prepaid') {
-      const parts = [];
-      for (let i = 0; i < 5; i++) {
-        parts.push(Math.floor(1000 + Math.random() * 9000));
+       
+      } else {
+        setLoading(false);
+        triggerError(res?.error || res?.message || 'Transaction failed. Please try again.');
       }
-      setTokenGenerated(parts.join('-'));
+    } catch (err: any) {
+      console.log(err);
+      setLoading(false);
+      triggerError(err?.message || 'Transaction failed. Please check your connection and try again.');
     }
   };
 
@@ -123,27 +322,100 @@ const BuyElectricity = () => {
           </span>
         </div>
 
-        {/* Success Banner */}
-        {success && (
-          <div className="flex flex-col gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 animate-[fadeIn_.3s_ease]">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" className="w-4 h-4">
-                  <polyline points="20 6 9 17 4 12" />
+        {/* Error Banner */}
+        {errorMessage && (
+          <div ref={pageRef} className="flex items-start justify-between gap-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl p-4 shadow-lg shadow-rose-500/5 animate-[fadeIn_.3s_ease]">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-rose-400">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
               </div>
               <div>
-                <div className="text-sm font-semibold text-emerald-400">Bill Payment Successful!</div>
-                <div className="text-xs text-text-muted mt-0.5">
-                  ₦{activeAmount.toLocaleString()} has been charged for meter {meterNumber}.
-                </div>
+                <div className="text-sm font-semibold text-rose-400">Transaction Error</div>
+                <div className="text-xs text-rose-300/80 mt-0.5 leading-relaxed">{errorMessage}</div>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-rose-400/60 hover:text-rose-300 transition-colors p-1"
+              aria-label="Dismiss error"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {success && (
+          <div className="flex flex-col gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3 animate-[fadeIn_.3s_ease]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" className="w-4 h-4">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-emerald-400">Bill Payment Successful!</div>
+                  <div className="text-xs text-text-muted mt-0.5">
+                    ₦{activeAmount.toLocaleString()} has been charged for meter {meterNumber}.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccess(false)}
+                className="text-emerald-400/60 hover:text-emerald-300 transition-colors p-1 shrink-0"
+                aria-label="Dismiss success"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
             {tokenGenerated && (
-              <div className="mt-1 p-3 bg-bg-dark-secondary border border-border rounded-xl flex flex-col gap-1 items-center justify-center">
+              <div ref={pageRef} className="mt-1 p-3 bg-bg-dark-secondary border border-border rounded-xl flex flex-col gap-2 items-center justify-center">
                 <span className="text-[10px] uppercase tracking-wider text-text-muted font-bold">Electricity Token</span>
-                <span className="text-lg font-mono font-bold tracking-widest text-emerald-400 select-all">{tokenGenerated}</span>
-                <span className="text-[10px] text-text-muted">Enter this token on your meter keyboard.</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-mono font-bold tracking-widest text-emerald-400 select-all">{tokenGenerated}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(tokenGenerated);
+                      setTokenCopied(true);
+                      setTimeout(() => setTokenCopied(false), 2000);
+                    }}
+                    className="p-1.5 rounded-lg border border-border bg-bg-dark hover:bg-bg-card-hover hover:border-border-hover transition-all duration-200 shrink-0"
+                    title="Copy token"
+                    aria-label="Copy electricity token"
+                  >
+                    {tokenCopied ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" className="w-3.5 h-3.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-text-muted">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                <span className="text-[10px] text-text-muted">
+                  {tokenCopied ? (
+                    <span className="text-emerald-400 font-medium">Token copied!</span>
+                  ) : (
+                    'Enter this token on your meter keyboard.'
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -155,7 +427,7 @@ const BuyElectricity = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-5">
                 <h3 className="text-text-white font-semibold text-sm font-['Space_Grotesk'] pb-3 border-b border-border">Quick Electricity Payment</h3>
-                
+
                 {/* Select Provider */}
                 <div className="space-y-2">
                   <label className="block text-xs font-medium text-text-gray">Select Provider</label>
@@ -190,11 +462,10 @@ const BuyElectricity = () => {
                     <button
                       type="button"
                       onClick={() => setMeterType('prepaid')}
-                      className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${
-                        meterType === 'prepaid'
+                      className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${meterType === 'prepaid'
                           ? 'border-primary bg-primary/5 ring-1 ring-primary/30 text-text-white'
                           : 'border-border bg-bg-dark-secondary text-text-gray hover:border-border-hover'
-                      }`}
+                        }`}
                     >
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-4 h-4 transition-colors ${meterType === 'prepaid' ? 'text-primary' : 'text-text-muted'}`}>
                         <circle cx="12" cy="12" r="10" />
@@ -205,16 +476,15 @@ const BuyElectricity = () => {
 
                     <button
                       type="button"
-                      onClick={() => setMeterType('postpaid')}
-                      className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${
-                        meterType === 'postpaid'
+                      onClick={() => setMeterType('Postpaid')}
+                      className={`flex items-center justify-center gap-2 py-3.5 rounded-xl border text-sm font-semibold transition-all duration-200 ${meterType === 'Postpaid'
                           ? 'border-primary bg-primary/5 ring-1 ring-primary/30 text-text-white'
                           : 'border-border bg-bg-dark-secondary text-text-gray hover:border-border-hover'
-                      }`}
+                        }`}
                     >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-4 h-4 transition-colors ${meterType === 'postpaid' ? 'text-primary' : 'text-text-muted'}`}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-4 h-4 transition-colors ${meterType === 'Postpaid' ? 'text-primary' : 'text-text-muted'}`}>
                         <circle cx="12" cy="12" r="10" />
-                        {meterType === 'postpaid' && <circle cx="12" cy="12" r="6" fill="currentColor" />}
+                        {meterType === 'Postpaid' && <circle cx="12" cy="12" r="6" fill="currentColor" />}
                       </svg>
                       Postpaid
                     </button>
@@ -252,7 +522,7 @@ const BuyElectricity = () => {
                 </div>
 
                 {/* Customer Verification Box */}
-                {isVerified && (
+                {isVerified ? (
                   <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-xl p-4 space-y-3 animate-[fadeIn_.2s_ease]">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-emerald-400">Customer Verification</span>
@@ -266,11 +536,11 @@ const BuyElectricity = () => {
                     <div className="space-y-2 text-xs">
                       <div className="flex flex-col sm:flex-row sm:justify-between">
                         <span className="text-text-muted">Customer Name</span>
-                        <span className="text-text-white font-semibold">Michael Anazodo</span>
+                        <span className="text-text-white font-semibold">{customerName}</span>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:justify-between">
                         <span className="text-text-muted">Address</span>
-                        <span className="text-text-white font-medium">Lekki Phase 1, Lagos</span>
+                        <span className="text-text-white font-medium">{address}</span>
                       </div>
                       <div className="flex flex-col sm:flex-row sm:justify-between">
                         <span className="text-text-muted">DisCo</span>
@@ -278,7 +548,34 @@ const BuyElectricity = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                ) : isVerified === null ? (
+                   <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4 space-y-3 animate-[fadeIn_.2s_ease]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-red-400">Customer Verification</span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full border border-red-500/20">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-2.5 h-2.5">
+                          <path d="M20 6L9 17l-5-5" />
+                        </svg>
+                        Not Verified
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex flex-col sm:flex-row sm:justify-between">
+                        <span className="text-text-muted">Customer Name</span>
+                        <span className="text-text-white font-semibold">{customerName}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between"></div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between">
+                        <span className="text-text-muted">Address</span>
+                        <span className="text-text-white font-medium">{address}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between">
+                        <span className="text-text-muted">DisCo</span>
+                        <span className="text-text-white font-medium">{selectedDiscoName}</span>
+                      </div>
+                    </div>
+                  </div>
+                ): null}
 
                 {/* Select Amount (Dropdown) */}
                 <div className="space-y-4">
@@ -344,24 +641,14 @@ const BuyElectricity = () => {
                       <span className="text-text-muted">Amount</span>
                       <span className="text-text-white font-medium">₦{activeAmount.toLocaleString()}.00</span>
                     </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">Service Fee</span>
-                      <span className="text-text-white font-medium">₦{serviceFee.toLocaleString()}.00</span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-text-muted">VAT</span>
-                      <span className="text-text-white font-medium">₦{vat.toLocaleString()}.00</span>
-                    </div>
                   </div>
 
                   <div className="pt-3 border-t border-border flex items-center justify-between bg-primary/5 -mx-5 px-5 py-3 rounded-b-2xl">
                     <div>
                       <div className="text-xs text-text-muted mb-0.5">Total Debit</div>
-                      <div className="text-xl font-bold text-primary-light font-['Space_Grotesk']">₦{totalDebit.toLocaleString()}.00</div>
+                      <div className="text-xl font-bold text-primary-light font-['Space_Grotesk']">₦{activeAmount.toLocaleString()}.00</div>
                     </div>
-                    
+
                     <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -439,97 +726,101 @@ const BuyElectricity = () => {
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search transactions..."
+                    placeholder="Search by ID, meter or ref..."
+                    value={txSearch}
+                    onChange={(e) => { setTxSearch(e.target.value); setTxPage(1); }}
                     className="w-full pl-10 pr-4 py-2 rounded-xl bg-bg-dark-secondary border border-border text-xs text-text-white placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
                   />
-                </div>
-
-                <div className="flex gap-2">
-                  <button type="button" className="px-3 py-1 rounded-full bg-primary text-white text-[11px] font-semibold">
-                    All Status
-                  </button>
-                  <button type="button" className="px-3 py-1 rounded-full bg-bg-dark-secondary border border-border text-text-gray hover:text-text-white text-[11px] font-medium transition-colors">
-                    This Month
-                  </button>
                 </div>
               </div>
 
               {/* Payments Table */}
               <div className="overflow-x-auto border border-border rounded-xl">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-bg-dark-secondary border-b border-border text-text-gray font-medium">
-                      <th className="p-3">Transaction ID</th>
-                      <th className="p-3">Customer</th>
-                      <th className="p-3">DisCo</th>
-                      <th className="p-3">Meter Number</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border text-text-white">
-                    <tr className="hover:bg-bg-dark-secondary/40 transition-colors">
-                      <td className="p-3 font-semibold text-text-white">EB-24091</td>
-                      <td className="p-3">Michael Anazodo</td>
-                      <td className="p-3">Ikeja Electric</td>
-                      <td className="p-3 font-mono">12345678901</td>
-                      <td className="p-3 font-semibold">₦5,000</td>
-                      <td className="p-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                          Success
-                        </span>
-                      </td>
-                      <td className="p-3 text-text-muted">Today</td>
-                    </tr>
-                    <tr className="hover:bg-bg-dark-secondary/40 transition-colors">
-                      <td className="p-3 font-semibold text-text-white">EB-24090</td>
-                      <td className="p-3">Sarah Okafor</td>
-                      <td className="p-3">Eko Electric</td>
-                      <td className="p-3 font-mono">10987654321</td>
-                      <td className="p-3 font-semibold">₦10,000</td>
-                      <td className="p-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 border border-amber-500/20 text-amber-400">
-                          Pending
-                        </span>
-                      </td>
-                      <td className="p-3 text-text-muted">Today</td>
-                    </tr>
-                    <tr className="hover:bg-bg-dark-secondary/40 transition-colors">
-                      <td className="p-3 font-semibold text-text-white">EB-24089</td>
-                      <td className="p-3">David Musa</td>
-                      <td className="p-3">Abuja Electric</td>
-                      <td className="p-3 font-mono">11223344556</td>
-                      <td className="p-3 font-semibold">₦20,000</td>
-                      <td className="p-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 border border-red-500/20 text-red-400">
-                          Failed
-                        </span>
-                      </td>
-                      <td className="p-3 text-text-muted">Yesterday</td>
-                    </tr>
-                  </tbody>
-                </table>
+                {paginatedElectricityTx.length > 0 ? (
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-bg-dark-secondary border-b border-border text-text-gray font-medium">
+                        <th className="p-3">Transaction ID</th>
+                        <th className="p-3">Customer</th>
+                        <th className="p-3">Meter / Recipient</th>
+                        <th className="p-3">Amount</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border text-text-white">
+                      {paginatedElectricityTx.map((tx: any) => {
+                        const s = tx.status?.toLowerCase() === 'delivered' ? 'success' : tx.status?.toLowerCase();
+                        const statusClass =
+                          s === 'success'
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                            : s === 'pending'
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                            : s === 'failed'
+                            ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                            : 'bg-bg-dark border-border text-text-muted';
+                        return (
+                          <tr key={tx._id} className="hover:bg-bg-dark-secondary/40 transition-colors">
+                            <td className="p-3 font-semibold text-text-white font-mono">{formatId(tx._id)}</td>
+                            <td className="p-3 text-text-gray">{currentUser?.firstName ?? ''} {currentUser?.lastName ?? ''}</td>
+                            <td className="p-3 font-mono text-text-muted">{tx.recipient ?? 'N/A'}</td>
+                            <td className="p-3 font-semibold">₦{tx.amount?.toLocaleString()}</td>
+                            <td className="p-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusClass}`}>
+                                {tx.status === 'delivered' ? 'success' : tx.status}
+                              </span>
+                            </td>
+                            <td className="p-3 text-text-muted">{formatDate(tx.paidAt)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="py-10 text-center text-xs text-text-muted">
+                    {txSearch ? 'No transactions match your search.' : 'No electricity transactions yet.'}
+                  </div>
+                )}
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between text-xs text-text-muted pt-2">
-                <span>Showing 1 to 3 of 24 payments</span>
-                <div className="flex items-center gap-1">
-                  <button type="button" className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-dark-secondary text-text-white hover:bg-bg-card-hover transition-colors font-medium">
-                    Previous
-                  </button>
-                  <button type="button" className="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-white font-bold">
-                    1
-                  </button>
-                  <button type="button" className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-bg-dark-secondary border border-transparent hover:border-border text-text-gray hover:text-text-white transition-colors">
-                    2
-                  </button>
-                  <button type="button" className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-dark-secondary text-text-white hover:bg-bg-card-hover transition-colors font-medium">
-                    Next
-                  </button>
+              {totalTxPages > 1 && (
+                <div className="flex items-center justify-between text-xs text-text-muted pt-2">
+                  <span>
+                    Showing {(txPage - 1) * TX_PER_PAGE + 1}–{Math.min(txPage * TX_PER_PAGE, filteredElectricityTx.length)} of {filteredElectricityTx.length} payments
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={txPage === 1}
+                      onClick={() => setTxPage((p) => Math.max(p - 1, 1))}
+                      className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-dark-secondary text-text-white hover:bg-bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      Previous
+                    </button>
+                    {Array.from({ length: totalTxPages }).map((_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setTxPage(i + 1)}
+                        className={`w-7 h-7 flex items-center justify-center rounded-lg font-bold transition-all ${
+                          txPage === i + 1 ? 'bg-primary text-white' : 'bg-bg-card border border-border text-text-gray hover:bg-bg-card-hover'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={txPage === totalTxPages}
+                      onClick={() => setTxPage((p) => Math.min(p + 1, totalTxPages))}
+                      className="px-2.5 py-1.5 rounded-lg border border-border bg-bg-dark-secondary text-text-white hover:bg-bg-card-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -538,20 +829,20 @@ const BuyElectricity = () => {
             {/* Wallet Card */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
               <h3 className="text-text-white font-semibold text-sm font-['Space_Grotesk']">Wallet Card</h3>
-              
+
               <div className="bg-gradient-to-r from-blue-600 to-cyan-500 rounded-2xl p-5 text-white space-y-4 shadow-lg">
                 <div>
                   <span className="text-xs opacity-80 block">Available Balance</span>
-                  <span className="text-2xl sm:text-3xl font-bold font-['Space_Grotesk'] mt-1 block">₦150,000.00</span>
+                  <span className="text-2xl sm:text-3xl font-bold font-['Space_Grotesk'] mt-1 block">{formatAmount(accountBalance, true)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
                   <div>
                     <span className="text-[10px] opacity-75 uppercase tracking-wider block">Today's Spending</span>
-                    <span className="text-sm font-semibold block mt-0.5">₦12,500</span>
+                    <span className="text-sm font-semibold block mt-0.5">{formatAmount(getTodaysTransactionAmount() || 0, true)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] opacity-75 uppercase tracking-wider block">Total Payments</span>
-                    <span className="text-sm font-semibold block mt-0.5">248</span>
+                    <span className="text-sm font-semibold block mt-0.5">{formatAmount(allTransactions.length || 0, false)}</span>
                   </div>
                 </div>
               </div>
@@ -573,7 +864,7 @@ const BuyElectricity = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-text-white font-semibold text-sm font-['Space_Grotesk']">Saved Meters</h3>
               </div>
-              
+
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 space-y-3 relative group">
                 <span className="absolute top-4 right-4 text-[9px] font-bold text-text-gray bg-bg-dark border border-border px-2 py-0.5 rounded-full">
                   Primary
@@ -585,12 +876,12 @@ const BuyElectricity = () => {
                     <div>DisCo: Ikeja Electric</div>
                   </div>
                 </div>
-                
+
                 <button
                   type="button"
                   onClick={() => {
-                    setMeterNumber('12345678901');
-                    setSelectedDisco('ikeja');
+                    setMeterNumber('');
+                    setSelectedDisco('ikeja-electric');
                     setMeterType('prepaid');
                   }}
                   className="py-1.5 px-4 rounded-lg bg-bg-dark border border-border text-xs text-text-white hover:bg-bg-card-hover font-semibold transition-all duration-200 w-full"
@@ -603,7 +894,7 @@ const BuyElectricity = () => {
             {/* Recent Token Purchase */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
               <h3 className="text-text-white font-semibold text-sm font-['Space_Grotesk']">Recent Token Purchase</h3>
-              
+
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 space-y-3">
                 <div>
                   <span className="text-[10px] text-text-muted uppercase tracking-wider block mb-1">Token</span>
@@ -611,7 +902,7 @@ const BuyElectricity = () => {
                     1234 5678 9012 3456
                   </span>
                 </div>
-                
+
                 <div className="grid grid-cols-3 gap-2 text-xs border-t border-border pt-3">
                   <div>
                     <span className="text-[10px] text-text-muted block">Amount</span>
@@ -702,7 +993,7 @@ const BuyElectricity = () => {
             {/* Electricity Payment Tips */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
               <h3 className="text-text-white font-semibold text-sm font-['Space_Grotesk']">Payment Tips</h3>
-              
+
               <div className="space-y-2 text-xs">
                 <div className="flex items-start gap-2 bg-bg-dark-secondary border border-border/60 rounded-xl p-3 text-text-gray">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5">

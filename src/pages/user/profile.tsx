@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../context/themeContext';
-// import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import { formatAmount } from '../../utils/formatter';
+import { editProfile, getTransactions, uploadProfilePic, changePassword } from '../../api/user';
 import {
   UserIcon,
   EnvelopeIcon,
@@ -28,6 +30,7 @@ import {
   SparklesIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
+const transactions = await getTransactions()
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 interface ToastMessage {
@@ -45,18 +48,52 @@ interface ActivityEvent {
 
 export default function Profile() {
   const { theme, toggleTheme } = useTheme();
-//  const { currentUser } = useAuth() as {currentUser: {firstName: string, lastName: string, role: string, email: string}}
+  const { currentUser, accountBalance } = useAuth();
+
+  // Derived user values
+  const fullName = currentUser
+    ? `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim()
+    : '';
+  const initials = currentUser
+    ? `${currentUser.firstName?.[0] ?? ''}${currentUser.lastName?.[0] ?? ''}`.toUpperCase()
+    : '?';
+  const memberSince = useMemo(() => {
+    const d = currentUser?.createdAt ?? currentUser?.joinedDate;
+    if (!d) return '—';
+    return new Date(d).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }, [currentUser]);
 
   // --- States ---
   const [formData, setFormData] = useState({
-    fullName: 'Michael Anazodo',
-    email: 'michael@example.com',
-    phone: '+234 803 123 4567',
-    dob: '1998-05-15',
-    gender: 'Male',
+    firstName: currentUser?.firstName ?? 'user',
+    lastName: currentUser?.lastName ?? '',
+    email: currentUser?.email ?? '',
+    phone: currentUser?.phone ?? '',
+    dob: currentUser?.dateOfBirth ?? '',
+    gender: 'male',
   });
   const [originalFormData, setOriginalFormData] = useState({ ...formData });
   const [isEditingInfo, setIsEditingInfo] = useState(false);
+
+  // Sync formData when currentUser loads
+  React.useEffect(() => {
+    if (currentUser) {
+      const name = `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim();
+      setFormData(prev => ({
+        ...prev,
+        firstName: currentUser.firstName ,
+        lastName: currentUser.lastName,
+        email: currentUser.email ?? prev.email,
+        phone: currentUser.phone ?? prev.phone,
+      }));
+      setOriginalFormData(prev => ({
+        ...prev,
+        fullName: name || prev.fullName,
+        email: currentUser.email ?? prev.email,
+        phone: currentUser.phone ?? prev.phone,
+      }));
+    }
+  }, [currentUser]);
 
   // Security Toggles
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
@@ -94,9 +131,9 @@ export default function Profile() {
   // Developer Control Switcher
   const [isEmptyActivity, setIsEmptyActivity] = useState(false);
 
-  // Mock Variables
-  const referralCode = 'SWT-MICHAEL-248';
-  const referralLink = `https://vtunova.com/ref/${referralCode}`;
+  // Live referral values from API
+  const referralCode = currentUser?.referralCode ?? '—';
+  const referralLink = referralCode !== '—' ? `https://vtunova.com/ref/${referralCode}` : '';
   
   const [activities, setActivities] = useState<ActivityEvent[]>([
     { id: 'act-1', type: 'profile', description: 'Profile information updated successfully.', time: '10 mins ago' },
@@ -128,24 +165,43 @@ export default function Profile() {
     }
   };
 
-  const handleInfoSave = (e: React.FormEvent) => {
+  const handleInfoSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.fullName.trim() || !formData.email.trim() || !formData.phone.trim()) {
+    if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.email.trim() || !formData.phone.trim()) {
       triggerToast('Please fill out all required fields.', 'danger');
       return;
     }
     setOriginalFormData({ ...formData });
     setIsEditingInfo(false);
+
+    // Update user profile
+    const updatedUser = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      phone: formData.phone,
+      dateOfBirth: formData.dob.toISOString(),
+      gender: formData.gender,
+      address: formData.address,
+    };
+
+    // await updateUserProfile(updatedUser);
+    const res = await editProfile(updatedUser);
+    if (!res?.success) {
+      triggerToast('Profile update failed. Please try again.', 'danger');
+      return;
+    }
+    triggerToast('Personal details updated successfully!', 'success');
     
     // Add new activity log
-    const newAct: ActivityEvent = {
-      id: `act-${Date.now()}`,
-      type: 'profile',
-      description: 'Profile information updated successfully.',
-      time: 'Just now',
-    };
-    setActivities(prev => [newAct, ...prev]);
-    triggerToast('Personal details updated successfully!', 'success');
+    // const newAct: ActivityEvent = {
+    //   id: `act-${Date.now()}`,
+    //   type: 'profile',
+    //   description: 'Profile information updated successfully.',
+    //   time: 'Just now',
+    // };
+    // setActivities(prev => [newAct, ...prev]);
+    // triggerToast('Personal details updated successfully!', 'success');
   };
 
   const handleInfoCancel = () => {
@@ -154,7 +210,7 @@ export default function Profile() {
     triggerToast('Edits cancelled.', 'info');
   };
 
-  const handlePasswordUpdate = (e: React.FormEvent) => {
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!passwords.current || !passwords.new || !passwords.confirm) {
       triggerToast('All password fields are required.', 'danger');
@@ -170,16 +226,26 @@ export default function Profile() {
     }
     
     // Clear state
-    setPasswords({ current: '', new: '', confirm: '' });
+    // setPasswords({ current: '', new: '' });
+
+    const res = await changePassword({currentPassword: passwords.current, newPassword: passwords.new});
+
+    if(!res?.success) {
+      triggerToast(res?.error || 'Password update failed. Please try again.', 'danger');
+      return;
+    }
+
+    // Clear state
+     setPasswords({ current: '', new: '', confirm: '' });
     
     // Log activity
-    const newAct: ActivityEvent = {
-      id: `act-${Date.now()}`,
-      type: 'security',
-      description: 'Account security password changed.',
-      time: 'Just now',
-    };
-    setActivities(prev => [newAct, ...prev]);
+    // const newAct: ActivityEvent = {
+    //   id: `act-${Date.now()}`,
+    //   type: 'security',
+    //   description: 'Account security password changed.',
+    //   time: 'Just now',
+    // };
+    // setActivities(prev => [newAct, ...prev]);
     triggerToast('Password updated successfully!', 'success');
   };
 
@@ -200,13 +266,20 @@ export default function Profile() {
     triggerToast('Two-Factor Authentication configured successfully!', 'success');
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    const photo = file
+    const formData = new FormData();
+
+    formData.append("photo", file);
+
+    const res = await uploadProfilePic(formData);
+    console.log(res?.error)
+    if (file && res?.success) {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setProfilePhoto(event.target.result as string);
+          setProfilePhoto(`http://localhost:3000/${currentUser?.profilePic?.url}`);
           triggerToast('Profile photo updated successfully!', 'success');
         }
       };
@@ -218,7 +291,7 @@ export default function Profile() {
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray font-sans transition-colors duration-200">
       
       {/* ── Developer controls panel ── */}
-      <div className="bg-blue-600/10 border-b border-blue-500/20 py-2 px-6 flex items-center justify-between text-xs text-blue-500">
+      {/* <div className="bg-blue-600/10 border-b border-blue-500/20 py-2 px-6 flex items-center justify-between text-xs text-blue-500">
         <div className="flex items-center gap-2">
           <SparklesIcon className="w-4 h-4 animate-pulse" />
           <span><strong>Developer Demo Controls:</strong> Switch states to preview design features.</span>
@@ -232,7 +305,7 @@ export default function Profile() {
           </button>
         </div>
       </div>
-
+ */}
       <div className="p-6 space-y-6 max-w-7xl mx-auto w-full">
 
         {/* ── Page Header ── */}
@@ -289,18 +362,23 @@ export default function Profile() {
           <div className="p-6 pt-0 relative flex flex-col lg:flex-row gap-6 justify-between items-stretch">
             
             {/* Avatar Uploader (overlapping cover image) and User Profile Info */}
-            <div className="flex flex-col md:flex-row items-center md:items-start gap-5 -mt-12 md:-mt-16 relative z-10">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-5 -mt-16 md:-mt-20 relative z-10">
               
               {/* Photo Upload Container */}
               <div className="relative group shrink-0">
-                <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 border-4 border-bg-card overflow-hidden flex items-center justify-center text-white text-3xl font-extrabold font-['Space_Grotesk'] shadow-lg">
-                  {profilePhoto ? (
-                    <img src={profilePhoto} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span>MA</span>
-                  )}
+                {/* Outer glow ring */}
+                <div className="p-1 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-purple-500 shadow-[0_0_24px_rgba(59,130,246,0.4)]">
+                <div className="w-48 h-48 md:w-48 md:h-48 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 border-4 border-bg-card overflow-hidden flex items-center justify-center text-white text-5xl font-extrabold font-['Space_Grotesk'] shadow-xl">
+                    {/* {profilePhoto ? (
+                      <img src={`http://localhost:3000/${currentUser?.profilePic?.url}`} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{initials}</span>
+                    )} */}
+                      <img src={`http://localhost:3000/${currentUser?.profilePic?.url}`} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
                 </div>
-                <label className="absolute inset-1 bg-black/60 opacity-0 group-hover:opacity-100 rounded-xl flex flex-col items-center justify-center text-[10px] text-white font-bold cursor-pointer transition-opacity">
+                {/* Camera overlay on hover */}
+                <label className="absolute inset-1 bg-black/60 opacity-0 group-hover:opacity-100 rounded-full flex flex-col items-center justify-center text-[10px] text-white font-bold cursor-pointer transition-opacity">
                   <CameraIcon className="w-5 h-5 mb-1" />
                   <span>Upload</span>
                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
@@ -311,31 +389,52 @@ export default function Profile() {
               <div className="text-center md:text-left space-y-2 pt-1 md:pt-14 mt-10">
                 <div>
                   <h3 className="text-xl font-extrabold text-text-white font-['Space_Grotesk'] leading-none">
-                    {formData.fullName}
+                    {formData.firstName || '—'}
                   </h3>
                   <p className="text-xs text-text-muted mt-1.5 flex items-center justify-center md:justify-start gap-1">
                     <EnvelopeIcon className="w-3.5 h-3.5" />
-                    <span>{formData.email}</span>
+                    <span>{formData.email || '—'}</span>
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-1.5 pt-0.5">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
-                    <CheckIcon className="w-3 h-3" />
-                    <span>Email Verified</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
-                    <CheckIcon className="w-3 h-3" />
-                    <span>Phone Verified</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
-                    <ExclamationTriangleIcon className="w-3 h-3 text-amber-500" />
-                    <span>ID Pending</span>
-                  </span>
+                  {currentUser?.emailVerified ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                      <CheckIcon className="w-3 h-3" />
+                      <span>Email Verified</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
+                      <ExclamationTriangleIcon className="w-3 h-3" />
+                      <span>Email Unverified</span>
+                    </span>
+                  )}
+                  {currentUser?.phoneVerified ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                      <CheckIcon className="w-3 h-3" />
+                      <span>Phone Verified</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
+                      <ExclamationTriangleIcon className="w-3 h-3" />
+                      <span>Phone Unverified</span>
+                    </span>
+                  )}
+                  {currentUser?.identityVerified && (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                      <CheckIcon className="w-3 h-3" />
+                      <span>ID Verified</span>
+                    </span>
+                  ) /* : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-sm">
+                      <ExclamationTriangleIcon className="w-3 h-3" />
+                      <span>ID Pending</span>
+                    </span>
+                  ) */}
                 </div>
                 
                 <div className="text-[11px] text-text-muted pt-0.5">
-                  Member since: <span className="font-semibold text-text-gray">January 2026</span>
+                  Member since: <span className="font-semibold text-text-gray">{memberSince}</span>
                 </div>
               </div>
             </div>
@@ -344,19 +443,29 @@ export default function Profile() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-center shrink-0 w-full lg:w-auto pt-6 lg:pt-8 border-t lg:border-t-0 border-border lg:mt-0 mt-4">
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[105px] flex-1 hover:border-blue-500/35 transition-colors">
                 <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Transactions</span>
-                <span className="text-lg font-bold text-text-white font-['Space_Grotesk']">148</span>
+                <span className="text-lg font-bold text-text-white font-['Space_Grotesk']">
+                  {transactions.transactions.length ?? '—'}
+                </span>
               </div>
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[115px] flex-1 hover:border-emerald-500/35 transition-colors">
                 <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Wallet Bal</span>
-                <span className="text-lg font-extrabold text-emerald-400 font-['Space_Grotesk']">₦150,000</span>
+                <span className="text-lg font-extrabold text-emerald-400 font-['Space_Grotesk']">
+                  {formatAmount(accountBalance ?? currentUser?.wallet?.balance ?? 0, true)}
+                </span>
               </div>
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[105px] flex-1 hover:border-purple-500/35 transition-colors">
                 <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Referrals</span>
-                <span className="text-lg font-bold text-text-white font-['Space_Grotesk']">7</span>
+                <span className="text-lg font-bold text-text-white font-['Space_Grotesk']">
+                  {Array.isArray(currentUser?.referrals) ? currentUser.referrals.length : '—'}
+                </span>
               </div>
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[105px] flex-1 hover:border-cyan-500/35 transition-colors">
-                <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Tier Level</span>
-                <span className="text-lg font-bold text-blue-500 font-['Space_Grotesk']">Level 2</span>
+                <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Status</span>
+                <span className={`text-sm font-bold font-['Space_Grotesk'] ${
+                  currentUser?.isActive ? 'text-emerald-400' : 'text-rose-400'
+                }`}>
+                  {currentUser?.isActive ? 'Active' : 'Inactive'}
+                </span>
               </div>
             </div>
 
@@ -386,9 +495,9 @@ export default function Profile() {
               </div>
 
               <form onSubmit={handleInfoSave} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                {/* Full name */}
+                {/* First name */}
                 <div className="space-y-1">
-                  <label className="text-xs text-text-gray font-semibold">Full Name</label>
+                  <label className="text-xs text-text-gray font-semibold">First Name</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
                       <UserIcon className="w-4 h-4" />
@@ -396,8 +505,23 @@ export default function Profile() {
                     <input
                       type="text"
                       disabled={!isEditingInfo}
-                      value={formData.fullName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+                      value={formData.firstName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className="bg-bg-dark-secondary disabled:opacity-75 border border-border text-xs text-text-white rounded-xl pl-9 pr-4 py-2.5 w-full focus:outline-none focus:border-blue-500/50 transition-colors"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-text-gray font-semibold">Last Name</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted">
+                      <UserIcon className="w-4 h-4" />
+                    </span>
+                    <input
+                      type="text"
+                      disabled={!isEditingInfo}
+                      value={formData.lastName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                       className="bg-bg-dark-secondary disabled:opacity-75 border border-border text-xs text-text-white rounded-xl pl-9 pr-4 py-2.5 w-full focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
                   </div>
@@ -414,7 +538,6 @@ export default function Profile() {
                       type="email"
                       disabled={!isEditingInfo}
                       value={formData.email}
-                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                       className="bg-bg-dark-secondary disabled:opacity-75 border border-border text-xs text-text-white rounded-xl pl-9 pr-4 py-2.5 w-full focus:outline-none focus:border-blue-500/50 transition-colors"
                     />
                   </div>
@@ -501,36 +624,50 @@ export default function Profile() {
               <div className="space-y-3.5 text-xs">
                 <div className="flex justify-between items-center pb-2 border-b border-border/50">
                   <span className="text-text-muted">Customer ID:</span>
-                  <span className="font-semibold text-text-white font-mono">SWT-USR-49210</span>
+                  <span className="font-semibold text-text-white font-mono">
+                    {currentUser?.id ? `USR-${currentUser.id.slice(-8).toUpperCase()}` : '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-border/50">
-                  <span className="text-text-muted">Username:</span>
-                  <span className="font-semibold text-text-white">michael_anazodo</span>
+                  <span className="text-text-muted">Full Name:</span>
+                  <span className="font-semibold text-text-white">
+                    {fullName || '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-border/50">
                   <span className="text-text-muted">Joined Date:</span>
-                  <span className="font-semibold text-text-white">12 January 2026</span>
+                  <span className="font-semibold text-text-white">
+                    {currentUser?.createdAt
+                      ? new Date(currentUser.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                      : currentUser?.joinedDate ?? '—'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-border/50">
-                  <span className="text-text-muted">Last Logged:</span>
-                  <span className="font-semibold text-text-white">Today, 9:32 PM</span>
+                  <span className="text-text-muted">Role:</span>
+                  <span className="font-semibold text-text-white capitalize">{currentUser?.role ?? '—'}</span>
                 </div>
                 <div className="flex justify-between items-center pb-2 border-b border-border/50">
                   <span className="text-text-muted">Status:</span>
-                  <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    Active Account
+                  <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    currentUser?.isActive
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  }`}>
+                    {currentUser?.isActive ? 'Active Account' : 'Inactive'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center pt-1">
                   <span className="text-text-muted">Referral Code:</span>
                   <div className="flex items-center gap-1 bg-bg-dark-secondary px-2 py-1 rounded-lg border border-border font-mono text-text-white">
                     <span>{referralCode}</span>
-                    <button
-                      onClick={() => handleCopy(referralCode, 'code')}
-                      className="text-blue-500 hover:text-blue-600 ml-1.5"
-                    >
-                      <DocumentDuplicateIcon className="w-3.5 h-3.5" />
-                    </button>
+                    {referralCode !== '—' && (
+                      <button
+                        onClick={() => handleCopy(referralCode, 'code')}
+                        className="text-blue-500 hover:text-blue-600 ml-1.5"
+                      >
+                        <DocumentDuplicateIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -712,7 +849,7 @@ export default function Profile() {
                   </div>
                 </div>
 
-                <div>
+                {/* <div>
                   <div className="flex justify-between font-semibold mb-1 text-text-white">
                     <span>Identity Verification (BVN/NIN)</span>
                     <span className="text-amber-500 font-bold">60% Pending</span>
@@ -720,9 +857,9 @@ export default function Profile() {
                   <div className="w-full h-1.5 bg-bg-dark-secondary rounded-full overflow-hidden border border-border">
                     <div className="bg-amber-500 h-full rounded-full" style={{ width: '60%' }} />
                   </div>
-                </div>
+                </div> */}
 
-                <div>
+                {/* <div>
                   <div className="flex justify-between font-semibold mb-1 text-text-white">
                     <span>Address Verification</span>
                     <span className="text-text-muted font-bold">0% Unverified</span>
@@ -730,7 +867,7 @@ export default function Profile() {
                   <div className="w-full h-1.5 bg-bg-dark-secondary rounded-full overflow-hidden border border-border">
                     <div className="bg-zinc-600 h-full rounded-full" style={{ width: '0%' }} />
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
 

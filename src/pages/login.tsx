@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import logoImg from '../assets/img/vtuNova_logo.png';
+import Logo from '../components/Logo';
 import {
   ArrowLeftIcon,
   BoltIcon,
@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
+import ApiError from '../api/ApiError';
 
 // console.log(localStorage.getItem('vtuNova_key'))
 // const fil = localStorage.getItem('vtuNova_key')
@@ -41,8 +42,9 @@ const Login = () => {
   // }
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { login } = useAuth() as { login: (credentials: { email: string; password?: string }) => { success: boolean; error?: string ; user?: any } };
+  // const { login } = useAuth() as { login: (credentials: { email: string; password?: string }) => { success: boolean; error?: string ; user?: any } };
   const { theme, toggleTheme } = useTheme() as {theme: string, toggleTheme: () => void};
+  const {login, currentUser} = useAuth()
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -76,7 +78,10 @@ const Login = () => {
 
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
-    const res = login({ email: form.email, password: form.password });
+
+    try {
+       const res = await login({ email: form.email, password: form.password });
+    console.log(res)
     setLoading(false);
     // console.log(form.email, form.password)
 
@@ -86,14 +91,23 @@ const Login = () => {
         user: '/user/dashboard',
         admin: '/admin/dashboard',
       }
-      const role = res.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
-      const destination = roleHome[role] || params.get('from') || '/';
+      const role = res.response.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
+      const destination = roleHome[role] || params.get('from')
+      // console.log(res.user.role)
       setTimeout(() => navigate(destination), 1200);
     } else {
-      triggerError('Invalid credentials. Please try again.');
+       setLoading(false);
+      triggerError(res?.error || 'Invalid credentials. Please try again.');
       setShowError(true)
       return
     }
+    } catch (error) {
+      console.error(error);
+      setLoading(false);
+      if(error instanceof ApiError) return triggerError(error.message);
+
+    }
+   
   };
 
   return (
@@ -104,7 +118,7 @@ const Login = () => {
         aria-label="Return home"
         className="absolute top-4 left-4 z-50 w-9 h-9 rounded-full bg-bg-dark-secondary border border-border flex items-center justify-center text-text-gray hover:text-text-white hover:border-border-hover transition-all duration-200"
       >
-        <ArrowLeftIcon className="w-4 h-4" />
+        <ArrowLeftIcon className="w-4 h-4 " />
       </Link>
       {/* Theme Toggle Button */}
       <button
@@ -140,8 +154,10 @@ const Login = () => {
         <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Logo */}
-        <div className="px-5 pt-5">
-          <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
+        <div className="px-6 pt-6 mb-10 ml-11">
+          <Link to="/">
+            <Logo size="lg" />
+          </Link>
         </div>
 
         {/* Phone Mockup Area */}
@@ -250,7 +266,9 @@ const Login = () => {
         <div className="w-full max-w-md relative z-10">
           {/* Mobile logo */}
           <div className="mb-8 lg:hidden">
-            <img src={logoImg} alt="VtuNova" className="h-24 w-auto object-contain" />
+            <Link to="/">
+              <Logo size="lg" />
+            </Link>
           </div>
 
           <h1 className="text-2xl md:text-3xl font-extrabold text-text-white font-heading mb-2">

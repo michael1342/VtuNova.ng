@@ -1,155 +1,123 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import { getNotifications, clearNotifications as apiClearNotifications, readNotification, deleteNotification as apiDeleteNotification, markOneAsUnread } from '../api/notification.ts';
 
-export interface NotificationItem {
-  id: string;
+// ─── Backend Shapes ───────────────────────────────────────────────────────────
+export interface BackendNotification {
+  _id: string;
   category: 'transactions' | 'wallet' | 'security' | 'promotions' | 'system';
-  title: string;
-  message: string;
-  time: string;
-  dateGroup: 'Today' | 'Yesterday' | 'Older';
-  read: boolean;
-  txId?: string;
-  service?: string;
-  amount?: string;
+  title?: string;
+  message?: string;
+  date: string;
+  isRead: boolean;
+  transactionId?: string;
 }
 
+export interface BackendTransaction {
+  _id: string;
+  service?: string;
+  amount?: number;
+  status?: string;
+  date?: string;
+  [key: string]: any;
+}
+
+// ─── Context Shape ────────────────────────────────────────────────────────────
 interface NotificationContextProps {
-  notifications: NotificationItem[];
+  notifications: BackendNotification[];
+  transactions: BackendTransaction[];
   unreadCount: number;
   isEmptyState: boolean;
+  isLoading: boolean;
   setIsEmptyState: React.Dispatch<React.SetStateAction<boolean>>;
   markAsRead: (id: string) => void;
   markAsUnread: (id: string) => void;
   deleteNotification: (id: string) => void;
-  markAllAsRead: () => void;
+  markAllAsRead: () => Promise<void>;
   clearNotifications: () => void;
   restoreMockNotifications: () => void;
+  refetch: () => Promise<void>;
 }
-
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    category: 'transactions',
-    title: 'Airtime Purchase Successful',
-    message: 'Your ₦1,000 airtime purchase for MTN (0803••4321) was completed successfully. Cashback of ₦15 has been credited to your wallet.',
-    time: '10:24 AM',
-    dateGroup: 'Today',
-    read: false,
-    txId: 'TX-98031',
-    service: 'MTN Airtime',
-    amount: '₦1,000',
-  },
-  {
-    id: 'notif-2',
-    category: 'wallet',
-    title: 'Wallet Credited',
-    message: '₦20,000 has been successfully added to your VtuNova wallet via Bank Transfer transfer source.',
-    time: '8:14 AM',
-    dateGroup: 'Today',
-    read: false,
-    txId: 'TX-98232',
-    service: 'Bank Transfer Funding',
-    amount: '₦20,000',
-  },
-  {
-    id: 'notif-3',
-    category: 'security',
-    title: 'New Login Detected',
-    message: 'Your VtuNova account was accessed from a new device (Chrome, Windows) in Lagos, Nigeria. If this was not you, lock your credentials immediately.',
-    time: '6:32 AM',
-    dateGroup: 'Today',
-    read: false,
-    txId: 'SEC-89102',
-    service: 'Account Security Logs',
-    amount: '-',
-  },
-  {
-    id: 'notif-4',
-    category: 'transactions',
-    title: 'Electricity Token Generated',
-    message: 'Your payment of ₦5,000 for Ikeja Electric Prepaid Meter was successful. Token: 9801 - 2293 - 0984 - 2314 - 1109.',
-    time: 'Yesterday, 4:15 PM',
-    dateGroup: 'Yesterday',
-    read: true,
-    txId: 'TX-98086',
-    service: 'Ikeja Electric (IKEDC)',
-    amount: '₦5,000',
-  },
-  {
-    id: 'notif-5',
-    category: 'transactions',
-    title: 'Subscription Renewed',
-    message: 'DSTV Compact package subscription renewed successfully. Next billing date: 13 July 2026.',
-    time: 'Yesterday, 11:20 AM',
-    dateGroup: 'Yesterday',
-    read: true,
-    txId: 'TX-98027',
-    service: 'DSTV Subscription',
-    amount: '₦9,500',
-  },
-  {
-    id: 'notif-6',
-    category: 'promotions',
-    title: '₦100 Data Cashback Offer!',
-    message: 'Enjoy up to ₦100 instant discount on all data bundle orders above ₦1,500 placed before midnight today.',
-    time: '3 days ago',
-    dateGroup: 'Older',
-    read: true,
-    txId: 'PRO-2201',
-    service: 'Weekend Special Promo',
-    amount: '-',
-  },
-  {
-    id: 'notif-7',
-    category: 'system',
-    title: 'Scheduled System Upgrade',
-    message: 'We will be conducting critical server updates on Sunday, June 14, from 2:00 AM to 3:30 AM. Airtime and data purchase services may experience short lag intervals.',
-    time: '4 days ago',
-    dateGroup: 'Older',
-    read: true,
-    txId: 'SYS-0931',
-    service: 'Core Platform Updates',
-    amount: '-',
-  },
-];
 
 const NotificationContext = createContext<NotificationContextProps | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+  const [transactions, setTransactions] = useState<BackendTransaction[]>([]);
   const [isEmptyState, setIsEmptyState] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const result = await getNotifications();
+      if (result?.success && result.data) {
+        const data = result.data as any;
+        setNotifications(data.notifications ?? []);
+        setTransactions(data.transactions ?? []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const unreadCount = useMemo(() => {
     if (isEmptyState) return 0;
-    return notifications.filter((n) => !n.read).length;
+    return notifications.filter((n) => !n.isRead).length;
   }, [notifications, isEmptyState]);
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
     );
   };
 
-  const markAsUnread = (id: string) => {
+  const markAsUnread = async (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: false } : n))
+      prev.map((n) => (n._id === id ? { ...n, isRead: false } : n))
     );
+    try {
+      await markOneAsUnread(id);
+    } catch (err) {
+      console.error('Failed to mark notification as unread', err);
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  const deleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n._id !== id));
+    try {
+      await apiDeleteNotification(id);
+    } catch (err) {
+      console.error('Failed to delete notification', err);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    try {
+      await readNotification();
+    } catch (err) {
+      console.error('Failed to mark all as read', err);
+    }
+    // Optimistic update regardless of API result
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
-  const clearNotifications = () => {
+  const clearNotifications = async () => {
     setNotifications([]);
+    try {
+      await apiClearNotifications();
+    } catch (err) {
+      console.error('Failed to clear notifications', err);
+    }
   };
 
   const restoreMockNotifications = () => {
-    setNotifications(INITIAL_NOTIFICATIONS);
+    fetchNotifications();
     setIsEmptyState(false);
   };
 
@@ -157,8 +125,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     <NotificationContext.Provider
       value={{
         notifications,
+        transactions,
         unreadCount,
         isEmptyState,
+        isLoading,
         setIsEmptyState,
         markAsRead,
         markAsUnread,
@@ -166,6 +136,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         markAllAsRead,
         clearNotifications,
         restoreMockNotifications,
+        refetch: fetchNotifications,
       }}
     >
       {children}

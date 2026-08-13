@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import logoImg from '../assets/img/vtuNova_logo.png';
+import Logo from '../components/Logo';
+import axios from 'axios';
 import {
   ArrowLeftIcon,
   BoltIcon,
@@ -40,7 +41,7 @@ const Register = () => {
   const [animateShake, setAnimateShake] = useState(false);
 
   const navigate = useNavigate();
-  const { register } = useAuth() as {register: (credentials: { email: string; password?: string; role: string; firstName: string; lastName: string; }) => { success: boolean; error?: string; user?: any };}
+  // const { register } = useAuth() as {register: (credentials: { email: string; password?: string; firstName: string; lastName: string; }) => { success: boolean; error?: string; user?: any };}
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -83,6 +84,7 @@ const Register = () => {
     return null;
   };
 
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -96,34 +98,25 @@ const Register = () => {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
 
-     const letAdmin = "michaelanazodo2024@gmail.com"
-     const saveRole = form.email === letAdmin ? 'admin' : 'user'
-
-    // if (form.email === letAdmin) {
-    //  return setForm({role: 'admin'})
-    // }
+    const {register} = useAuth()
 
 
-    const res = register({
-      email: form.email,
-      password: form.password,
-      firstName: form.firstName,
-      lastName: form.lastName,
-      role: saveRole,
-    });
+   const res = await register({email: form.email, firstName: form.firstName, lastName: form.lastName, password: form.password});
+   console.log(res)
    
     setLoading(false);
-    if (res && res.success) {
+    if (res.data && res.data.success) {
       setSuccess('Account created successfully! Welcome aboard.');
       const roleHome: Record<string, string> = {
         user: '/user/dashboard',
         admin: '/admin/dashboard',
       };
-      const role = res.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
+      // const role = res.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
+      const role = res?.data?.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
       const destination = roleHome[role] || '/';
       setTimeout(() => navigate(destination), 1500);
     } else {
-      triggerError(res?.error || 'Registration failed. Please try again.');
+      triggerError(res?.data?.error || 'Registration failed. Please try again.');
     }
   };
 
@@ -172,8 +165,10 @@ const Register = () => {
         <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Logo */}
-        <div className="px-5 pt-5">
-          <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
+        <div className="px-6 pt-6">
+          <Link to="/">
+            <Logo size="lg" />
+          </Link>
         </div>
 
         {/* Illustration area */}
@@ -297,7 +292,9 @@ const Register = () => {
         <div className="w-full max-w-md relative z-10">
           {/* Logo (mobile only) */}
           <div className="mb-8 lg:hidden">
-            <img src={logoImg} alt="VtuNova" className="h-24 w-auto object-contain" />
+            <Link to="/">
+              <Logo size="lg" />
+            </Link>
           </div>
 
           {/* Header icon */}

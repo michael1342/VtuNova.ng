@@ -1,7 +1,11 @@
 import { useState, Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import logoImg from '../assets/img/vtuNova_logo.png';
+import Logo from './Logo';
 import { useNavigate } from 'react-router-dom';
+import { ThemeProvider } from '../context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
+
+
 import {
   Squares2X2Icon,
   PhoneIcon,
@@ -39,6 +43,9 @@ import {
   ShieldCheckIcon as ShieldCheckSolidIcon
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
+import Badge from './ui/Badge';
+
 import { type ReactNode } from 'react';
 
 type NavItem = {
@@ -224,7 +231,8 @@ const navItems: Record<string, NavItem[]> = {
 const Sidebar = () => {
   const [_, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const [collapsed, ] = useState(false);
+  const [collapsed,] = useState(false);
+  const theme = localStorage.getItem("theme")
 
   // type roleProp = {
   //   role: string;
@@ -237,16 +245,18 @@ const Sidebar = () => {
   //   .replace(/\s+/g, ' ')
   //   .trim()
   //   .toUpperCase();
-    
-    const { currentUser, logout } = useAuth() as {
-  currentUser: { role?: string } | null;
-  logout: (() => void) | null;
-};
+
+  const { currentUser, logout } = useAuth() as {
+    currentUser: { role?: string } | null;
+    logout: (() => void) | null;
+  };
   // const [currentUser, setCurrentUser] = useState<User | null>(null);
   const navigate = useNavigate()
 
+  const { unreadCount } = useNotifications();
+
   if (currentUser == null) {
-    return ;
+    return;
   }
 
   const newRole = currentUser.role?.toLowerCase().trim() || 'user';
@@ -264,11 +274,11 @@ const Sidebar = () => {
 
   return (
     <div
-      className={`flex flex-col h-full bg-bg-dark-secondary border-r border-border transition-all duration-300 ${collapsed ? ' w-1  md:w-56 ': 'w-56 '} shrink-0`}
+      className={`flex flex-col h-full bg-bg-dark-secondary border-r border-border transition-all duration-300 ${collapsed ? ' w-1  md:w-56 ' : 'w-56 '} shrink-0`}
     >
       {/* Logo */}
-      <div className="flex items-center py-2 border-b border-border h-[56px]">
-        <img src={logoImg} alt="VtuNova" className={`object-contain transition-all duration-300 ${collapsed ? 'w-16 h-16' : 'h-33 w-auto'}`} />
+      <div className="flex items-center py-2 px-3 border-b border-border h-[72px] overflow-hidden">
+        <Logo collapsed={collapsed} />
       </div>
 
       {/* Nav */}
@@ -298,11 +308,19 @@ const Sidebar = () => {
                       : 'text-text-gray hover:text-text-white hover:bg-bg-card-hover'
                     }`}
                 >
-                  <span className={`shrink-0 ${isActive ? 'text-blue-400' : 'text-text-muted group-hover:text-text-white'}`}>
+                  <span className={`shrink-0 relative ${isActive ? 'text-blue-400' : 'text-text-muted group-hover:text-text-white'}`}>
                     {item.icon}
+                    {collapsed && item.path.includes('/notifications') && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1">
+                        <Badge variant="primary" dot size="sm" ping />
+                      </span>
+                    )}
                   </span>
                   {!collapsed && <span>{item.label}</span>}
-                  {isActive && !collapsed && (
+                  {!collapsed && item.path.includes('/notifications') && unreadCount > 0 && (
+                    <Badge variant="primary" size="sm" count={unreadCount} className="ml-auto" />
+                  )}
+                  {isActive && !collapsed && !item.path.includes('/notifications') && (
                     <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400" />
                   )}
                 </Link>

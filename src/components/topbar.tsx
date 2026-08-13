@@ -1,7 +1,8 @@
 import { useTheme } from '../context/themeContext';
 import { useLocation, Link } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
-import { useNotifications } from '../context/NotificationContext';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNotifications, type BackendNotification, type BackendTransaction } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import {
   BellIcon,
   PhoneIcon,
@@ -10,10 +11,69 @@ import {
   Cog6ToothIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
+import { formatAmount } from '../utils/formatter.ts';
+import Badge from './ui/Badge';
 
 interface TopbarProps {
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
+}
+
+// Derive title based on notification and transaction data (matching notifications.tsx)
+function deriveTitle(n: BackendNotification, tx?: BackendTransaction): string {
+  if (n.title) return n.title;
+  if (!tx) return 'Notification';
+  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
+  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
+  if (isDeposit) return succeeded ? 'Deposit Successful' : 'Deposit Failed';
+  return succeeded ? `${tx.service ?? 'Purchase'} Successful` : `${tx.service ?? 'Purchase'} Failed`;
+}
+
+// Derive message body
+function deriveMessage(n: BackendNotification, tx?: BackendTransaction): string {
+  if (n.message) return n.message;
+  if (!tx) return 'You have a new notification.';
+  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
+  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
+  const amtStr = tx.amount != null ? formatAmount(tx.amount, true) : 'an amount';
+  if (isDeposit) {
+    return succeeded
+      ? `Your deposit of ${amtStr} was completed successfully.`
+      : `Your deposit of ${amtStr} failed. Please try again.`;
+  }
+  return succeeded
+    ? `Your purchase of ${amtStr} via ${tx.service ?? 'service'} was completed successfully.`
+    : `Your purchase of ${amtStr} via ${tx.service ?? 'service'} failed.`;
+}
+
+// Derive notification category
+function deriveCategory(n: BackendNotification, tx?: BackendTransaction): string {
+  if (n.category) return n.category;
+  if (!tx) return 'system';
+  const svc = tx.service?.toLowerCase() ?? '';
+  if (svc === 'deposit' || svc === 'fund') return 'wallet';
+  return 'transactions';
+}
+
+// Format relative or compact timestamp for topbar preview
+function formatNotificationTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch (e) {
+    return dateStr;
+  }
 }
 
 const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
@@ -21,6 +81,7 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
   const location = useLocation();
   const {
     notifications,
+    transactions,
     unreadCount,
     markAsRead,
     markAllAsRead,
@@ -28,6 +89,15 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { currentUser, accountBalance } = useAuth();
+
+  // Fast lookup map for transactions
+  const txMap = useMemo(() => {
+    const map = new Map<string, BackendTransaction>();
+    (transactions || []).forEach((tx) => map.set(tx._id, tx));
+    return map;
+  }, [transactions]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -74,25 +144,27 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
   const renderCategoryIcon = (category: string) => {
     switch (category) {
       case 'transactions':
-        return <PhoneIcon className="w-4 h-4 text-blue-500" />;
+        return <PhoneIcon className="w-4 h-4 text-blue-400" />;
       case 'wallet':
-        return <CreditCardIcon className="w-4 h-4 text-emerald-500" />;
+        return <CreditCardIcon className="w-4 h-4 text-emerald-400" />;
       case 'security':
-        return <ShieldCheckIcon className="w-4 h-4 text-amber-500" />;
+        return <ShieldCheckIcon className="w-4 h-4 text-amber-400" />;
       case 'promotions':
-        return <BellIcon className="w-4 h-4 text-purple-500" />;
+        return <BellIcon className="w-4 h-4 text-purple-400" />;
       case 'system':
-        return <Cog6ToothIcon className="w-4 h-4 text-cyan-500" />;
+        return <Cog6ToothIcon className="w-4 h-4 text-cyan-400" />;
       default:
         return <BellIcon className="w-4 h-4 text-text-muted" />;
     }
   };
 
   // Get top 5 recent notifications
-  const recentNotifications = notifications.slice(0, 5);
+  const recentNotifications = useMemo(() => {
+    return (notifications || []).slice(0, 5);
+  }, [notifications]);
 
   return (
-    <header className="sticky top-0 z-20 bg-bg-dark-secondary backdrop-blur border-b border-border flex items-center justify-between px-4 sm:px-6 py-3 transition-colors duration-200">
+    <header className="sticky top-0 z-20 bg-bg-dark-secondary backdrop-blur border-b border-border flex items-center justify-between px-4 sm:px-6 py-4.5 transition-colors duration-200">
       {/* Left — Mobile Toggle & Page Title */}
       <div className="flex items-center gap-2 sm:gap-3">
         <button
@@ -142,7 +214,6 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
           className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-bg-card border border-border flex items-center justify-center text-text-gray hover:text-text-white hover:border-border-hover transition-all duration-200"
         >
           {theme === 'dark' ? (
-            /* Sun icon — shown in dark mode to switch to light */
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 sm:w-4 sm:h-4">
               <circle cx="12" cy="12" r="5" />
               <line x1="12" y1="1" x2="12" y2="3" />
@@ -155,14 +226,13 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
               <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
             </svg>
           ) : (
-            /* Moon icon — shown in light mode to switch to dark */
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 sm:w-4 sm:h-4">
               <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
             </svg>
           )}
         </button>
 
-        {/* Bell */}
+        {/* Bell Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <button
             id="topbar-notifications"
@@ -178,10 +248,9 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
               <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
             </svg>
             {unreadCount > 0 && (
-              <>
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full" />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-              </>
+              <span className="absolute -top-1.5 -right-1.5">
+                <Badge variant="primary" size="sm" count={unreadCount} maxCount={9} ring />
+              </span>
             )}
           </button>
 
@@ -194,9 +263,13 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
                   <h3 className="text-xs font-bold text-text-white font-['Space_Grotesk']">
                     Notifications
                   </h3>
-                  {unreadCount > 0 && (
+                  {unreadCount > 0 ? (
                     <p className="text-[10px] text-blue-500 font-semibold mt-0.5">
                       You have {unreadCount} unread alert{unreadCount > 1 ? 's' : ''}
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-text-muted mt-0.5">
+                      All caught up!
                     </p>
                   )}
                 </div>
@@ -222,52 +295,64 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
                     </div>
                     <div>
                       <p className="text-xs font-bold text-text-white font-['Space_Grotesk']">
-                        All caught up!
+                        No notifications yet
                       </p>
                       <p className="text-[10px] text-text-muted max-w-[200px] mx-auto mt-0.5">
-                        No new notifications at the moment.
+                        Your transaction and account alerts will appear here.
                       </p>
                     </div>
                   </div>
                 ) : (
-                  recentNotifications.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        markAsRead(item.id);
-                      }}
-                      className={`p-3.5 flex gap-3 hover:bg-bg-dark-secondary/40 cursor-pointer transition-colors group relative ${
-                        item.read ? '' : 'bg-blue-500/[0.01]'
-                      }`}
-                    >
-                      {/* Unread dot indicator */}
-                      {!item.read && (
-                        <span className="absolute left-2 top-[22px] w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      )}
+                  recentNotifications.map((item) => {
+                    const tx = item.transactionId ? txMap.get(item.transactionId) : undefined;
+                    const title = deriveTitle(item, tx);
+                    const message = deriveMessage(item, tx);
+                    const category = deriveCategory(item, tx);
+                    const time = formatNotificationTime(item.date);
 
-                      {/* Icon */}
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                        item.read ? 'bg-bg-dark-secondary/60 border-border' : 'bg-blue-500/10 border-blue-500/20'
-                      }`}>
-                        {renderCategoryIcon(item.category)}
-                      </div>
+                    return (
+                      <div
+                        key={item._id}
+                        onClick={() => {
+                          if (!item.isRead) {
+                            markAsRead(item._id);
+                          }
+                        }}
+                        className={`p-3.5 flex gap-3 hover:bg-bg-dark-secondary/60 cursor-pointer transition-colors group relative ${
+                          item.isRead ? '' : 'bg-blue-500/[0.04]'
+                        }`}
+                      >
+                        {/* Unread dot indicator */}
+                        {!item.isRead && (
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50" />
+                        )}
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-[11px] font-bold text-text-white truncate group-hover:text-blue-500 transition-colors">
-                            {item.title}
-                          </h4>
-                          <span className="text-[9px] text-text-muted font-mono whitespace-nowrap shrink-0">
-                            {item.time}
-                          </span>
+                        {/* Icon */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                          item.isRead ? 'bg-bg-dark-secondary/60 border-border' : 'bg-blue-500/10 border-blue-500/20'
+                        }`}>
+                          {renderCategoryIcon(category)}
                         </div>
-                        <p className="text-[10px] text-text-gray line-clamp-2 leading-relaxed">
-                          {item.message}
-                        </p>
+
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className={`text-[11px] font-bold truncate transition-colors ${
+                              item.isRead ? 'text-text-white group-hover:text-blue-400' : 'text-blue-400'
+                            }`}>
+                              {title}
+                            </h4>
+                            <span className="text-[9px] text-text-muted font-mono whitespace-nowrap shrink-0">
+                              {time}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-text-gray line-clamp-2 leading-relaxed">
+                            {message}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 
@@ -291,17 +376,33 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
             <rect x="2" y="5" width="20" height="14" rx="2" />
             <path d="M2 10h20" />
           </svg>
-          <span className="text-text-white font-bold text-xs sm:text-sm font-['Space_Grotesk'] hidden min-[400px]:inline">₦150,000.00</span>
+          <span className="text-text-white font-bold text-xs sm:text-sm font-['Space_Grotesk'] hidden min-[400px]:inline">{formatAmount(accountBalance, true)}</span>
         </div>
 
         {/* Avatar */}
-        <button
+        <Link
+          to="/user/profile"
           id="topbar-avatar"
-          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs sm:text-sm hover:ring-2 hover:ring-blue-500/50 transition-all duration-200"
+          className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-[11px] sm:text-xs ring-2 ring-transparent hover:ring-blue-500/50 transition-all duration-200 uppercase overflow-hidden shrink-0"
           aria-label="User profile"
+          title={currentUser?.firstName ? `${currentUser.firstName} ${currentUser.lastName || ''}` : 'User Profile'}
         >
-          M
-        </button>
+          {(currentUser as any)?.profilePic?.url ? (
+            <img
+              src={`http://localhost:3000/${(currentUser as any).profilePic.url}`}
+              alt={currentUser?.firstName?.[0] ?? 'U'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Hide broken image to reveal initials fallback
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : null}
+          {/* Initials fallback — visible when no image or image fails to load */}
+          {/* <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            {currentUser?.firstName?.[0] ?? ''}{currentUser?.lastName?.[0] ?? ''}
+          </span> */}
+        </Link>
       </div>
     </header>
   );

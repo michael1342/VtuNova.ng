@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/themeContext';
 import { Link } from 'react-router-dom';
-import logoImg from '../assets/img/vtuNova_logo.png';
+import Logo from '../components/Logo';
 
 const LandingPage = () => {
   const { theme, toggleTheme } = useTheme();
@@ -31,7 +31,7 @@ const LandingPage = () => {
       <header className={`fixed top-0 left-0 right-0 border-b border-border z-[1000] flex items-center transition-all duration-300 ${isScrolled ? 'h-[70px] bg-bg-dark/90 shadow-[0_10px_30px_rgba(0,0,0,0.1)]' : 'h-20 bg-bg-dark/70 backdrop-blur-lg'}`}>
         <div className="max-w-[1200px] w-full mx-auto px-6 flex justify-between items-center">
           <a href="#" className="flex items-center">
-            <img src={logoImg} alt="VtuNova" className="h-35 w-auto object-contain" />
+            <Logo size="md" />
           </a>
           <ul className="hidden min-[901px]:flex gap-8 list-none">
             <li><a href="#" className="text-[0.95rem] font-medium text-text-gray hover:text-text-white">Home</a></li>
@@ -180,8 +180,8 @@ const LandingPage = () => {
             {/* Mini Sidebar */}
             <div className="w-[140px] shrink-0 bg-bg-dark-secondary border-r border-border flex flex-col py-3 px-2.5 gap-0.5 hidden min-[500px]:flex">
               {/* Logo */}
-              <div className="flex items-center px-2 py-2 mb-2">
-                <img src={logoImg} alt="VtuNova" className="h-10 w-auto object-contain" />
+              <div className="flex items-center px-1 py-1 mb-2">
+                <Logo size="sm" showTagline={false} />
               </div>
               
               {/* Nav Items */}
@@ -949,7 +949,7 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 min-[481px]:grid-cols-2 min-[901px]:grid-cols-[1.5fr_1fr_1fr_1fr] gap-10 min-[901px]:gap-[60px] mb-15">
             <div className="flex flex-col items-start gap-4">
               <a href="#" className="flex items-center">
-                <img src={logoImg} alt="VtuNova" className="h-30 w-auto object-contain" />
+                <Logo size="lg" />
               </a>
               <p className="text-text-gray leading-[1.6] max-w-[320px]">
                 Automated airtime distribution, data packet provisioning, and utility meter bill payments for users.
