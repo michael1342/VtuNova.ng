@@ -1,15 +1,5 @@
 // import React from 'react';
-
-export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'warning' | 'info' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
-  dot?: boolean;
-  ping?: boolean;
-  count?: number;
-  maxCount?: number;
-  ring?: boolean;
-  children?: React.ReactNode;
-}
+import type { BadgeProps } from '../../interface/components.interface';
 
 export const Badge: React.FC<BadgeProps> = ({
   variant = 'primary',

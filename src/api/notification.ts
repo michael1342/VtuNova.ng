@@ -7,11 +7,12 @@ export const getNotifications = async () => {
         const response = await http.get("/notifications/get-notifications");
         if(!response) throw new ApiError({message: 'No notifications found'})
         if(!response) return null
-        return { data: response, success: true };
+        return { data: [response], success: true };
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message, data: [] };
         }
+        return { success: false, error: (err as any)?.message || 'Failed to fetch notifications', data: [] };
     }
 }
 
@@ -62,7 +63,7 @@ export const deleteNotification = async (id: string): Promise<any | undefined> =
     try {
         const response = await http.delete(`/notifications/delete-notification/${id}`);
         if (!response) return null
-        return { data: response, success: true };
+        return response
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message, data: [] };

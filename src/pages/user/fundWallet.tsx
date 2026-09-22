@@ -13,7 +13,7 @@ const FundWallet: React.FC = () => {
   const [method, setMethod] = useState<'card' | 'bank' | 'ussd'>('card');
   const [amount, setAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const { setAccountBalance, accountBalance } = useAuth();
+  const { accountBalance } = useAuth();
 
   // Card states
   const [cardNumber, setCardNumber] = useState('');
@@ -31,7 +31,6 @@ const FundWallet: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [lastTxId, setLastTxId] = useState<string>('');
-  const [showPayModal, setShowPayModal] = useState<boolean>(false);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
 
 
@@ -104,7 +103,6 @@ const FundWallet: React.FC = () => {
     setLoading(false);
     setSuccess(true);
     setErrorMessage(null);
-    setShowPayModal(false);
 
     // Reset card fields
     setCardNumber('');
@@ -112,7 +110,7 @@ const FundWallet: React.FC = () => {
     setCvv('');
   };
 
-  // General Submit Handler: Initialize Payment & Open Modal
+  // General Submit Handler: Single Pay Action
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearMessages();
@@ -147,7 +145,7 @@ const FundWallet: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Initialize Payment
+      // Initialize Payment
       const initRes = await PaymentApi.initializePayment({ amount: activeAmount });
 
       if (!initRes.success) {
@@ -157,46 +155,19 @@ const FundWallet: React.FC = () => {
       }
 
       // If backend redirects to Paystack authorization page
-      console.log(initRes);
-
-      if (initRes?.response.data?.authorization_url) {
-        window.open(initRes.response.data.authorization_url, "_blank");
+      const paymentResponse = initRes.response as { data?: { authorization_url?: string }; authorization_url?: string } | undefined;
+      const authUrl = paymentResponse?.data?.authorization_url || paymentResponse?.authorization_url;
+      if (authUrl) {
+        //redirect
+        window.location.href = authUrl;
       }
 
-      setLoading(false);
-      setShowPayModal(true);
+      completeSuccessfulPayment();
     } catch (err: any) {
       if (err instanceof ApiError) {
         triggerError(err.message);
       } else {
         triggerError(err?.message || 'Payment processing failed. Please try again.');
-      }
-      setLoading(false);
-    }
-  };
-
-  // Pay action called on click of modal pay button
-  const pay = async () => {
-    setLoading(true);
-    setSuccess(false);
-    try {
-      // 2. Verify Payment
-      const verifyRes = await PaymentApi.verifyPayment();
-
-      if (!verifyRes.success) {
-        setShowPayModal(false);
-        triggerError(verifyRes.error || 'Payment verification failed.');
-        setLoading(false);
-        return;
-      } 
-      completeSuccessfulPayment();
-      setAccountBalance(activeAmount + (accountBalance ?? 0));
-    } catch (err: any) {
-      setShowPayModal(false);
-      if (err instanceof ApiError) {
-        triggerError(err.message);
-      } else {
-        triggerError(err?.message || 'Verification failed.');
       }
       setLoading(false);
     }
@@ -716,92 +687,6 @@ const FundWallet: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* ── PAY CONFIRMATION MODAL ── */}
-        {showPayModal && (
-          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-[fadeIn_.2s_ease]">
-            <div className="bg-bg-card border border-border rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-5 relative animate-[scaleUp_.2s_ease]">
-
-              {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-border pb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary-light">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5">
-                      <rect x="2" y="5" width="20" height="14" rx="2" />
-                      <line x1="2" y1="10" x2="22" y2="10" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-text-white font-bold text-base font-['Space_Grotesk']">Confirm Payment</h3>
-                    <p className="text-[11px] text-text-muted">Review details before completing transaction</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPayModal(false)}
-                  className="text-text-muted hover:text-text-white p-1 transition-colors"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Payment Summary */}
-              <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 space-y-3">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-text-muted">Funding Channel:</span>
-                  <span className="text-text-white font-semibold">
-                    {method === 'card' ? 'Card Payment' : method === 'bank' ? 'Bank Transfer' : 'USSD Code'}
-                  </span>
-                </div>
-                {PaymentApi.reference && (
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-text-muted">Transaction Ref:</span>
-                    <span className="text-primary-light font-mono font-semibold">{PaymentApi.reference}</span>
-                  </div>
-                )}
-                <div className="border-t border-border pt-3 flex justify-between items-center">
-                  <span className="text-xs font-medium text-text-gray">Amount to Pay:</span>
-                  <span className="text-xl font-bold font-['Space_Grotesk'] text-emerald-400">
-                    ₦{activeAmount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPayModal(false)}
-                  className="w-1/3 py-3 rounded-xl border border-border hover:bg-bg-card-hover text-text-gray hover:text-text-white font-semibold text-xs transition-all cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={pay}
-                  disabled={loading}
-                  className="w-2/3 py-3.5 rounded-xl bg-gradient-to-r from-primary to-blue-500 text-white font-semibold text-xs shadow-[0_4px_20px_rgba(59,130,246,0.4)] hover:shadow-[0_6px_30px_rgba(59,130,246,0.5)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {loading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Verifying Payment...
-                    </>
-                  ) : (
-                    `Pay ₦${activeAmount.toLocaleString()}`
-                  )}
-                </button>
-              </div>
-
-            </div>
-          </div>
-        )}
 
       </main>
     </div>

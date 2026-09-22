@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { type ReactNode } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/themeContext'
 import { NotificationProvider } from './context/NotificationContext'
@@ -19,6 +18,7 @@ import Notifications from './pages/user/notifications'
 import Profile from './pages/user/profile'
 import Settings from './pages/user/settings'
 import Login from './pages/login'
+import VerifyOtp from './pages/verifyOtp'
 import Unauthorized from './pages/unauthorized'
 import AdminDashboard from './pages/Admin/dashboard'
 import AdminUserManagement from './pages/Admin/user'
@@ -34,20 +34,12 @@ import AdminAnalytics from './pages/Admin/adminAnalytics'
 import AdminSettings from './pages/Admin/adminSettings'
 import AdminSupport from './pages/Admin/adminSupport'
 import './App.css'
+import type { ProtectedRouteProps } from './interface/components.interface';
 
 // const {currentUser} = useAuth();
 
-type ProtectedRouteProps = {
-  allowedRoles: string[];
-  children: ReactNode
-}
-
-
 const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 
-  type CurrentUserProps = {
-    role: string;
-  }
   const { currentUser } = useAuth()
 
   if (!currentUser) {
@@ -57,7 +49,7 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
     );
   }
 
-  if (!allowedRoles.includes(currentUser.role)) {
+  if (!currentUser.role || !allowedRoles.includes(currentUser.role)) {
     // return navigate('/unauthorized');
     return <Navigate to="/login" replace />;
   }
@@ -79,9 +71,10 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 function App() {
   return (
     <>
+     <NotificationProvider>
       <AuthProvider>
         <ThemeProvider>
-          <NotificationProvider>
+         
             <Router>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
@@ -139,13 +132,15 @@ function App() {
                   <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
                 </Route>
                 <Route path="/register" element={<Register />} />
+                <Route path="/verify-otp" element={<VerifyOtp />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
               </Routes>
             </Router>
-          </NotificationProvider>
+          
         </ThemeProvider>
       </AuthProvider>
+      </NotificationProvider>
     </>
   )
 }

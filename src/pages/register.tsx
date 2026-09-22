@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
-import axios from 'axios';
 import {
   ArrowLeftIcon,
   BoltIcon,
@@ -20,18 +19,19 @@ import {
 } from '@heroicons/react/24/outline';
 import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
+import ApiError from '../api/ApiError';
 
 const Register = () => {
   const [form, setForm] = useState({
-    email: '',
     firstName: '',
     lastName: '',
+    email: '',
     phone: '',
-    role: 'user',
     password: '',
     confirmPassword: '',
     referralCode: '',
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -41,7 +41,8 @@ const Register = () => {
   const [animateShake, setAnimateShake] = useState(false);
 
   const navigate = useNavigate();
-  // const { register } = useAuth() as {register: (credentials: { email: string; password?: string; firstName: string; lastName: string; }) => { success: boolean; error?: string; user?: any };}
+  const { register } = useAuth();
+  const { theme, toggleTheme } = useTheme() as { theme: string; toggleTheme: () => void };
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -55,7 +56,7 @@ const Register = () => {
     setTimeout(() => setAnimateShake(false), 500);
   };
 
-  // Password strength
+  // Password strength calculation
   const hasMinLength = form.password.length >= 8;
   const hasUppercase = /[A-Z]/.test(form.password);
   const hasNumber = /[0-9]/.test(form.password);
@@ -74,21 +75,21 @@ const Register = () => {
   const validate = () => {
     if (!form.firstName.trim()) return 'First Name is required.';
     if (!form.lastName.trim()) return 'Last Name is required.';
-    if (!form.email.trim()) return 'Email is required.';
-    if (!/\S+@\S+\.\S+/.test(form.email)) return 'Enter a valid email address.';
+    if (!form.email.trim()) return 'Email address is required.';
+    if (!/\S+@\S+\.\S+/.test(form.email.trim())) return 'Please enter a valid email address.';
+    if (form.phone && form.phone.trim().length < 10) return 'Please enter a valid phone number.';
     if (!form.password) return 'Password is required.';
     if (form.password.length < 6) return 'Password must be at least 6 characters.';
     if (form.password !== form.confirmPassword) return 'Passwords do not match.';
-    if (!agreedToTerms) return 'You must agree to the Terms of Service.';
-    if (!form.role) return 'Please select an account type.';
+    if (!agreedToTerms) return 'You must agree to the Terms of Service & Privacy Policy.';
     return null;
   };
 
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
     const validationError = validate();
     if (validationError) {
       triggerError(validationError);
@@ -98,29 +99,35 @@ const Register = () => {
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
 
-    const {register} = useAuth()
+    try {
+      const res = await register({
+        email: form.email.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        password: form.password,
+        phone: form.phone.trim(),
+        referralCode: form.referralCode.trim(),
+      });
 
+      setLoading(false);
 
-   const res = await register({email: form.email, firstName: form.firstName, lastName: form.lastName, password: form.password});
-   console.log(res)
-   
-    setLoading(false);
-    if (res.data && res.data.success) {
-      setSuccess('Account created successfully! Welcome aboard.');
-      const roleHome: Record<string, string> = {
-        user: '/user/dashboard',
-        admin: '/admin/dashboard',
-      };
-      // const role = res.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
-      const role = res?.data?.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
-      const destination = roleHome[role] || '/';
-      setTimeout(() => navigate(destination), 1500);
-    } else {
-      triggerError(res?.data?.error || 'Registration failed. Please try again.');
+      if (res && res.success) {
+        setSuccess('Account created. Check your email for the verification code.');
+        setTimeout(() => navigate('/verify-otp', {
+          state: { email: form.email.trim(), otpId: res.otpId || res.response?.otpId || res.response?.data?.otpId },
+        }), 700);
+      } else {
+        triggerError(res?.error || 'Registration failed. Please try again.');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setLoading(false);
+      if (err instanceof ApiError) {
+        return triggerError(err.message);
+      }
+      triggerError(err?.message || 'Something went wrong. Please try again.');
     }
   };
-
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen flex bg-bg-dark text-text-white relative overflow-hidden">
@@ -132,6 +139,8 @@ const Register = () => {
       >
         <ArrowLeftIcon className="w-4 h-4" />
       </Link>
+
+      {/* Theme Toggle Button */}
       <button
         onClick={toggleTheme}
         aria-label="Toggle theme"
@@ -158,30 +167,29 @@ const Register = () => {
         )}
       </button>
 
-      {/* Left Panel — Branding & Illustration */}
-      <div className="hidden lg:flex lg:w-[48%] xl:w-[45%] flex-col relative overflow-hidden bg-bg-dark-secondary">
+      {/* Left Panel — Branding & Illustration (Visible on lg/desktop screens) */}
+      <div className="hidden lg:flex lg:w-[48%] xl:w-[45%] flex-col relative overflow-hidden bg-bg-dark-secondary border-r border-border">
         {/* Background glows */}
         <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-[radial-gradient(circle,rgba(59,130,246,0.15)_0%,transparent_70%)] pointer-events-none" />
         <div className="absolute bottom-[-15%] right-[-10%] w-[400px] h-[400px] bg-[radial-gradient(circle,rgba(139,92,246,0.1)_0%,transparent_70%)] pointer-events-none" />
 
         {/* Logo */}
-        <div className="px-6 pt-6">
+        <div className="px-6 pt-6 mb-10 ml-11">
           <Link to="/">
             <Logo size="lg" />
           </Link>
         </div>
 
-        {/* Illustration area */}
+        {/* Phone Mockup Area */}
         <div className="flex-1 flex items-center justify-center px-10 relative">
-          {/* Phone mockup */}
           <div className="relative w-[260px] h-[480px]">
-            {/* Phone frame */}
+            {/* Phone Frame */}
             <div className="absolute inset-0 rounded-[32px] bg-gradient-to-b from-bg-card to-bg-dark border border-border shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
-              {/* Screen content */}
+              {/* Screen Content */}
               <div className="absolute inset-3 rounded-[24px] bg-bg-dark-secondary overflow-hidden">
-                {/* Status bar */}
+                {/* Status Bar */}
                 <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                  <span className="text-[10px] text-text-muted font-medium">9:41</span>
+                  <span className="text-[10px] text-text-muted font-medium font-heading">9:41</span>
                   <div className="flex gap-1">
                     <div className="w-3.5 h-2 rounded-sm bg-text-muted/30" />
                     <div className="w-1.5 h-2 rounded-sm bg-text-muted/30" />
@@ -189,7 +197,7 @@ const Register = () => {
                   </div>
                 </div>
 
-                {/* Wallet section */}
+                {/* Wallet Balance Section */}
                 <div className="px-5 pt-6">
                   <div className="text-[10px] text-text-muted mb-1">Wallet Balance</div>
                   <div className="text-2xl font-bold text-text-white font-heading">₦128,450</div>
@@ -203,7 +211,7 @@ const Register = () => {
                   </div>
                 </div>
 
-                {/* Quick actions */}
+                {/* Quick Actions */}
                 <div className="grid grid-cols-4 gap-2 px-5 mt-5">
                   {[
                     { icon: <PhoneIcon className="w-3 h-3" />, label: 'Airtime', color: 'text-primary' },
@@ -222,54 +230,52 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Floating cards */}
+            {/* Floating Notification Cards */}
             <div className="absolute -top-4 -left-10 animate-float">
               <div className="bg-bg-card/90 backdrop-blur-md border border-border rounded-xl px-4 py-2.5 shadow-lg flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-accent-green/20 flex items-center justify-center">
                   <CheckCircleIcon className="w-4 h-4 text-accent-green" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold text-text-white">Airtime Purchase</div>
-                  <div className="text-[9px] text-text-muted">₦1,000 · Successful</div>
+                  <div className="text-[11px] font-semibold text-text-white">Instant Setup</div>
+                  <div className="text-[9px] text-text-muted">Account ready · 0s Delay</div>
                 </div>
               </div>
             </div>
 
-            <div className="absolute top-28 -right-14" style={{ animation: 'float 6s ease-in-out 1s infinite' }}>
+            <div className="absolute top-28 -right-14 animate-float" style={{ animationDelay: '1.5s' }}>
               <div className="bg-bg-card/90 backdrop-blur-md border border-border rounded-xl px-4 py-2.5 shadow-lg flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
-                  <WifiIcon className="w-4 h-4 text-primary" />
+                  <BoltIcon className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold text-text-white">Data Bundle</div>
-                  <div className="text-[9px] text-text-muted">10GB · 30 Days</div>
+                  <div className="text-[11px] font-semibold text-text-white">Instant Top-Up</div>
+                  <div className="text-[9px] text-text-muted">Automated 24/7 delivery</div>
                 </div>
               </div>
             </div>
 
-            <div className="absolute bottom-12 -right-6" style={{ animation: 'float 6s ease-in-out 2s infinite' }}>
+            <div className="absolute bottom-12 -right-6 animate-float" style={{ animationDelay: '3s' }}>
               <div className="bg-bg-card/90 backdrop-blur-md border border-border rounded-xl px-4 py-2.5 shadow-lg flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-accent-orange/20 flex items-center justify-center">
-                  <BoltIcon className="w-4 h-4 text-accent-orange" />
+                  <CreditCardIcon className="w-4 h-4 text-accent-orange" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold text-text-white">Bill Payment</div>
-                  <div className="text-[9px] text-text-muted">Electricity · Confirmed</div>
+                  <div className="text-[11px] font-semibold text-text-white">Best Discounts</div>
+                  <div className="text-[9px] text-text-muted">Save on every transaction</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom text & badges */}
+        {/* Branding Footer Details */}
         <div className="px-10 pb-10">
           <p className="text-sm text-text-gray leading-relaxed mb-6 max-w-[380px]">
-            Buy airtime, purchase data bundles, pay electricity bills,
-            subscribe to cable TV, and manage your wallet from one
-            secure platform.
+            Join thousands of smart Nigerians saving money daily on airtime, data, electricity bills, and cable subscriptions.
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {['Instant Delivery', 'Secure Transactions', 'Affordable Rates', '24/7 Availability'].map(
+            {['Instant Delivery', 'Zero Hidden Fees', 'Discounted Rates', 'Secure Gateway'].map(
               (badge) => (
                 <div
                   key={badge}
@@ -285,31 +291,31 @@ const Register = () => {
       </div>
 
       {/* Right Panel — Registration Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-10 lg:px-16 relative">
-        {/* Subtle glow */}
+      <div className="flex-1 flex items-center justify-center px-6 py-10 lg:px-16 relative overflow-y-auto max-h-screen">
+        {/* Glow backdrop */}
         <div className="absolute top-[10%] right-[10%] w-[300px] h-[300px] bg-[radial-gradient(circle,rgba(59,130,246,0.06)_0%,transparent_70%)] pointer-events-none" />
 
-        <div className="w-full max-w-md relative z-10">
-          {/* Logo (mobile only) */}
-          <div className="mb-8 lg:hidden">
+        <div className="w-full max-w-md relative z-10 my-auto py-4">
+          {/* Mobile logo */}
+          <div className="mb-6 lg:hidden">
             <Link to="/">
               <Logo size="lg" />
             </Link>
           </div>
 
-          {/* Header icon */}
-         
           <h1 className="text-2xl md:text-3xl font-extrabold text-text-white font-heading mb-2">
             Create Your Account
           </h1>
-          <p className="text-sm text-text-gray mb-8">
-            Join VtuNova and start enjoying seamless digital services.
+          <p className="text-sm text-text-gray mb-6">
+            Join VtuNova and start enjoying seamless digital top-ups.
           </p>
 
-          {/* Error / Success */}
+          {/* Error Alert */}
           {error && (
             <div
-              className={`mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 ${animateShake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}
+              className={`mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 ${
+                animateShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
+              }`}
             >
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -318,6 +324,8 @@ const Register = () => {
               {error}
             </div>
           )}
+
+          {/* Success Alert */}
           {success && (
             <div className="mb-4 px-4 py-3 rounded-xl bg-accent-green/10 border border-accent-green/20 text-accent-green text-sm flex items-center gap-2">
               <CheckCircleIcon className="w-4 h-4 shrink-0" />
@@ -326,7 +334,7 @@ const Register = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Full Name row */}
+            {/* First & Last Name Grid */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-text-gray mb-1.5">First Name</label>
@@ -334,6 +342,7 @@ const Register = () => {
                   <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type="text"
+                    required
                     placeholder="John"
                     value={form.firstName}
                     onChange={(e) => set('firstName', e.target.value)}
@@ -341,12 +350,14 @@ const Register = () => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="block text-xs font-medium text-text-gray mb-1.5">Last Name</label>
                 <div className="relative">
                   <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type="text"
+                    required
                     placeholder="Doe"
                     value={form.lastName}
                     onChange={(e) => set('lastName', e.target.value)}
@@ -356,13 +367,14 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Email */}
+            {/* Email Address */}
             <div>
               <label className="block text-xs font-medium text-text-gray mb-1.5">Email Address</label>
               <div className="relative">
                 <EnvelopeIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="email"
+                  required
                   placeholder="you@email.com"
                   value={form.email}
                   onChange={(e) => set('email', e.target.value)}
@@ -371,7 +383,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Phone */}
+            {/* Phone Number */}
             <div>
               <label className="block text-xs font-medium text-text-gray mb-1.5">Phone Number</label>
               <div className="relative">
@@ -393,6 +405,7 @@ const Register = () => {
                 <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  required
                   placeholder="••••••••"
                   value={form.password}
                   onChange={(e) => set('password', e.target.value)}
@@ -407,29 +420,31 @@ const Register = () => {
                 </button>
               </div>
 
-              {/* Password strength bar */}
+              {/* Password strength indicators */}
               {form.password.length > 0 && (
-                <div className="mt-2.5">
-                  <div className="flex gap-1.5 mb-2">
+                <div className="mt-2">
+                  <div className="flex gap-1.5 mb-1.5">
                     {[0, 1, 2].map((i) => (
                       <div
                         key={i}
-                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${i < strengthScore ? strengthColor : 'bg-border'}`}
+                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                          i < strengthScore ? strengthColor : 'bg-border'
+                        }`}
                       />
                     ))}
                   </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    <span className={`text-[11px] flex items-center gap-1 ${hasMinLength ? 'text-accent-green' : 'text-text-muted'}`}>
-                      {hasMinLength ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full border border-text-muted inline-block" />}
-                      Minimum 8 characters
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span className={`text-[10px] flex items-center gap-1 ${hasMinLength ? 'text-accent-green' : 'text-text-muted'}`}>
+                      {hasMinLength ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-2.5 h-2.5 rounded-full border border-text-muted inline-block" />}
+                      8+ chars
                     </span>
-                    <span className={`text-[11px] flex items-center gap-1 ${hasUppercase ? 'text-accent-green' : 'text-text-muted'}`}>
-                      {hasUppercase ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full border border-text-muted inline-block" />}
-                      One uppercase letter
+                    <span className={`text-[10px] flex items-center gap-1 ${hasUppercase ? 'text-accent-green' : 'text-text-muted'}`}>
+                      {hasUppercase ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-2.5 h-2.5 rounded-full border border-text-muted inline-block" />}
+                      Uppercase
                     </span>
-                    <span className={`text-[11px] flex items-center gap-1 ${hasNumber ? 'text-accent-green' : 'text-text-muted'}`}>
-                      {hasNumber ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-3 h-3 rounded-full border border-text-muted inline-block" />}
-                      One number
+                    <span className={`text-[10px] flex items-center gap-1 ${hasNumber ? 'text-accent-green' : 'text-text-muted'}`}>
+                      {hasNumber ? <CheckCircleIcon className="w-3 h-3" /> : <span className="w-2.5 h-2.5 rounded-full border border-text-muted inline-block" />}
+                      Number
                     </span>
                   </div>
                 </div>
@@ -443,6 +458,7 @@ const Register = () => {
                 <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
+                  required
                   placeholder="••••••••"
                   value={form.confirmPassword}
                   onChange={(e) => set('confirmPassword', e.target.value)}
@@ -458,14 +474,14 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Referral Code */}
+            {/* Referral Code (Optional) */}
             <div>
               <label className="block text-xs font-medium text-text-gray mb-1.5">Referral Code (Optional)</label>
               <div className="relative">
                 <HashtagIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                 <input
                   type="text"
-                  placeholder="Enter code"
+                  placeholder="e.g. NOVA-1234"
                   value={form.referralCode}
                   onChange={(e) => set('referralCode', e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-bg-card border border-border text-sm text-text-white placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all duration-200"
@@ -473,8 +489,8 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Terms */}
-            <label className="flex items-start gap-2.5 cursor-pointer group">
+            {/* Terms of Service Checkbox */}
+            <label className="flex items-start gap-2.5 cursor-pointer group pt-1">
               <div className="relative mt-0.5">
                 <input
                   type="checkbox"
@@ -492,7 +508,7 @@ const Register = () => {
                   {agreedToTerms && <CheckIcon className="w-3 h-3 text-white" />}
                 </div>
               </div>
-              <span className="text-xs text-text-gray leading-relaxed">
+              <span className="text-xs text-text-gray leading-relaxed select-none">
                 I agree to the{' '}
                 <a href="#" className="text-primary hover:underline">
                   Terms of Service
@@ -504,11 +520,11 @@ const Register = () => {
               </span>
             </label>
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-accent-green to-emerald-500 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.4)] hover:shadow-[0_6px_30px_rgba(16,185,129,0.5)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-accent-green to-emerald-500 text-white font-semibold text-sm shadow-[0_4px_20px_rgba(16,185,129,0.4)] hover:shadow-[0_6px_30px_rgba(16,185,129,0.5)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 mt-2"
             >
               {loading ? (
                 <>
@@ -527,14 +543,14 @@ const Register = () => {
             </button>
           </form>
 
-          {/* Divider */}
+          {/* Social Sign-in Divider */}
           <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-px bg-border" />
             <span className="text-xs text-text-muted uppercase tracking-wider">or</span>
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          {/* Social buttons */}
+          {/* Social login buttons */}
           <div className="space-y-3">
             <button className="w-full py-2.5 rounded-xl border border-border bg-bg-card text-text-white text-sm font-medium hover:bg-bg-card-hover hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2.5">
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -553,7 +569,7 @@ const Register = () => {
             </button>
           </div>
 
-          {/* Sign in link */}
+          {/* Registration / Login link */}
           <p className="text-center text-sm text-text-gray mt-6">
             Already have an account?{' '}
             <Link to="/login" className="text-primary font-semibold hover:underline">

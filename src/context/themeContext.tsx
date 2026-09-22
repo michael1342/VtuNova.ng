@@ -1,19 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ProviderProps, ThemeContextType } from '../interface/context.interface';
 
 // const ThemeContext = createContext(null);
-type node = {
-  children: ReactNode
-}
-
-type ThemeContextType = {
-  theme: string;
-  toggleTheme: () => void;
-  setTheme: React.Dispatch<React.SetStateAction<string>>;
-};
-
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-export const ThemeProvider = ({ children }: node) => {
+export const ThemeProvider = ({ children }: ProviderProps) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) return saved;

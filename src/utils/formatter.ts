@@ -1,5 +1,5 @@
 export const formatAmount = (amount: number | null, currency: boolean): string | undefined => {
-    const formattedAmount =  currency ? `₦${amount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}` : amount?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    const formattedAmount =  currency ? `₦${amount?.toFixed(2).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}` : amount?.toFixed(2).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
     return formattedAmount
 }
 

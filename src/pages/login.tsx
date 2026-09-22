@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import Logo from '../components/Logo';
 import {
   ArrowLeftIcon,
@@ -19,6 +19,7 @@ import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
 import ApiError from '../api/ApiError';
 
+
 // console.log(localStorage.getItem('vtuNova_key'))
 // const fil = localStorage.getItem('vtuNova_key')
 // const fin = JSON.parse(fil)
@@ -27,7 +28,9 @@ import ApiError from '../api/ApiError';
 // console.log(tostring)
 
 const Login = () => {
-  const [form, setForm] = useState({ email: '', password: '' });
+  const location = useLocation();
+  const verifiedEmail = (location.state as { email?: string } | null)?.email || '';
+  const [form, setForm] = useState({ email: verifiedEmail, password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');

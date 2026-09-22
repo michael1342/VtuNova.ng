@@ -1,99 +1,88 @@
-import { createContext, useState, useContext, useCallback, type ReactNode } from "react";
+import { createContext, useState, useContext, useCallback } from "react";
+import type { AuthContextType, LoginCredentials, LoginResponse, ProviderProps, RegistrationCredentials } from '../interface/context.interface';
+import type { User } from '../interface/user.interface';
 import http from "../api/http";
 import  ApiError  from "../api/ApiError";
 import  useAuthStore  from "../api/store";
-import {type User} from "../api/store";
+import {getUser} from "../api/user";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
-type stringInfo = {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-};
-
-type loginInfo = {
-  email: string;
-  password: string;
-};
-
-interface LoginResponse {
-  user: User;
-  token?: string;
-}
-
-type AuthContextType = {
-  isAuthenticated: boolean;
-  setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
-  currentUser: User | null;
-  accountBalance: number | null;
-  response: User | null;
-  user: User | null;
-  setAccountBalance: (amount: number | null) => void;
-  register: (credentials: stringInfo) => Promise<any>;
-  login: (credentials: loginInfo) => Promise<any>;
-  logout: () => void;
-};
+export type { AuthContextType, LoginCredentials, ProviderProps, RegistrationCredentials } from '../interface/context.interface';
 
 const AuthContext =
   createContext<AuthContextType | null>(null);
 
-type Node = {
-  children: ReactNode;
-}
+  const current = await getUser()
 
-// const getProfile = async (): Promise<LoginResponse | any> => {
-//     try {
-//       const response = await http.get("/auth/profile");
-//       return response?.user
-//     } catch (error) {
-//       if (error instanceof ApiError) {
-//         return { success: false, error: error.message };
-//       }
-//     }
-//   };
-//   const currentUser = await getProfile()
-//   console.log(currentUser)
-
-export function AuthProvider({ children }: Node) {
+export function AuthProvider({ children }: ProviderProps) {
   const [isAuthenticated,  setIsAuthenticated]  = useState(false);
-  const currentUser = useAuthStore((state) => state.currentUser);
-  const setAccessToken = useAuthStore((state) => state.setAccessToken);
-  const setCurrentUser = useAuthStore((state) => state.setCurrentUser)
-  const setAccountBalance = useAuthStore((state) => state.setAccountBalance)
-  const accountBalance = useAuthStore((state) => state.accountBalance);
+  // const currentUser = useAuthStore((state) => state.currentUser);
+  const [currentUser, setCurrentUser] = useState<User | null>(current.response)
+  const [accountBalance, setAccountBalance] = useState<number | null>(() =>
+    typeof currentUser?.wallet === 'object' ? currentUser.wallet.balance : currentUser?.walletBalance ?? 0
+  );
   const clearAuth = useAuthStore((state) => state.clearAuth);
-  const accessToken = useAuthStore((state) => state.accessToken);
+  const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setOtpId = useAuthStore((state) => state.setOtpId);
 
   // ── Register ────────────────────────────────────────────────────────────────
-  const register =  async ({email, firstName, lastName, password}: stringInfo): Promise<any> => {
-      try {
-        const response = http.post('/auth/register', {email, firstName, lastName, password});
-        return response
-      } catch (error) {
-        if(error instanceof ApiError) {
-          return {success: false, error: error.message}
-          // console.log(error.message)
-        }
+  const register = async ({
+    email,
+    firstName,
+    lastName,
+    password,
+    phone,
+    role,
+    referralCode,
+  }: RegistrationCredentials): Promise<any> => {
+    try {
+      const payload: Record<string, any> = {
+        email,
+        firstName,
+        lastName,
+        password,
+      };
+      if (phone) payload.phone = phone;
+      if (role) payload.role = role;
+      if (referralCode) payload.referralCode = referralCode;
+
+      const response: any = await http.post('/auth/register', payload);
+      console.log('Register response:', response);
+
+      const user = response?.user || response?.data?.user;
+      const token = response?.token || response?.data?.token;
+      const otpId = response?.otpId || response?.data?.otpId;
+      if (user) {
+        setIsAuthenticated(true);
+        setOtpId(otpId || null);
       }
-    };
+
+      return { response, success: true, user, token, otpId };
+    } catch (error: any) {
+      if (error instanceof ApiError) {
+        return { success: false, error: error.message };
+      }
+      return { success: false, error: error?.message || 'Registration failed. Please try again.' };
+    }
+  };
 
 
     // ── Login ────────────────────────────────────────────────────────────────────
- const login = async ({ email, password }: loginInfo) => {
+ const login = async ({ email, password }: LoginCredentials) => {
     try {
       const response = await http.post<LoginResponse>("/auth/login", {
         email,
         password,
-      });
-      console.log(response)
-      const { token, user}: any = response
-
-      setAccessToken(token);
-      setCurrentUser(user);
-      setAccountBalance(user.wallet.balance);
+      }) as unknown as LoginResponse;
+console.log(response)
+      setCurrentUser(response.user);
       setIsAuthenticated(true);
+      setAccessToken(response.token ?? null);
+
+      if (response.token) {
+        setAccessToken(response.token);
+      }
 
       return {response, success: true};
     } catch (error) {
@@ -114,6 +103,7 @@ export function AuthProvider({ children }: Node) {
       await http.post("/auth/logout");
      clearAuth();
       setIsAuthenticated(false);
+      return {success: false}
     } catch (error) {
       if (error instanceof ApiError) {
         return { success: false, error: error.message };
@@ -124,7 +114,7 @@ export function AuthProvider({ children }: Node) {
   // ── Mock Transactions ────────────────────────────────────────────────────────
   
   return (
-  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, setAccountBalance}}>
+  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, setAccountBalance, response: currentUser, user: currentUser}}>
     {children}
   </AuthContext.Provider>
   )

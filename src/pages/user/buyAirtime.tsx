@@ -6,17 +6,8 @@ import paginate from '../../utils/pagination';
 // import { data } from 'react-router-dom';
 import { buyAirtime as ApiBuyAirtime } from '../../api/vtuApi';
 
-interface Beneficiary {
-  _id?: string;
-  id?: string;
-  name: string;
-  number: string;
-  phone?: string;
-  network: string;
-  service?: string;
-  success?: boolean;
-  error?: string
-}
+import NetworkIcon from '../../components/NetworkIcon';
+import type { Beneficiary } from '../../interface/user-page.interface';
 
 const networks = [
   { id: 'mtn', name: 'MTN', color: '#f59e0b', bg: 'bg-amber-500/15', text: 'text-amber-400', desc: 'Everywhere you go' },
@@ -26,27 +17,6 @@ const networks = [
 ];
 
 const presetAmounts = [200, 500, 1000, 2000, 3000, 4000, 5000, 10000];
-
-// const defaultBeneficiaries: any = await getBenficiary()
-
-const NetworkIcon = ({ networkId, size = 'md' }: { networkId: string; size?: 'sm' | 'md' }) => {
-  const map: Record<string, string> = {
-    mtn: 'MTN',
-    airtel: 'AIR',
-    glo: 'GLO',
-    '9mobile': '9M',
-  };
-  const sizeClass = size === 'sm' ? 'w-6 h-6 text-[9px]' : 'w-9 h-9 text-xs';
-  const net = networks.find((n) => n.id === networkId);
-  return (
-    <div
-      className={`${sizeClass} rounded-lg flex items-center justify-center font-bold shrink-0`}
-      style={{ background: net ? `${net.color}22` : '#3b82f622', color: net?.color ?? '#3b82f6' }}
-    >
-      {map[networkId] ?? '?'}
-    </div>
-  );
-};
 // const [amount, setAmount] = useState<number | null>(null);
 // const [presetAmounts, setPresetAmounts] = useState<number[]>([200, 500, 1000, 2000, 3000, 4000, 5000, 10000]);
 // const [phone, setPhone] = useState('');
@@ -62,7 +32,7 @@ const NetworkIcon = ({ networkId, size = 'md' }: { networkId: string; size?: 'sm
 // }
 
 const BuyAirtime: React.FC = () => {
-  const { accountBalance, setAccountBalance } = useAuth();
+  const { accountBalance } = useAuth();
 
   // Selection states
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -263,9 +233,6 @@ const BuyAirtime: React.FC = () => {
 
       if (res?.success) {
         // Update account balance
-        if (accountBalance !== null) {
-          setAccountBalance(Math.max(0, accountBalance - activeAmount));
-        }
         setLoading(false);
         setShowPayModal(false);
         setSuccess(true);
@@ -507,13 +474,24 @@ const BuyAirtime: React.FC = () => {
                       key={net.id}
                       type="button"
                       onClick={() => handleNetworkSelect(net.id)}
-                      className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 cursor-pointer ${selectedNetwork === net.id
-                          ? 'border-primary bg-primary/10 ring-1 ring-primary/30 shadow-[0_4px_16px_rgba(59,130,246,0.25)]'
-                          : 'border-border bg-bg-dark-secondary hover:border-border-hover'
-                        }`}
+                      className={`flex flex-col items-center justify-center p-3.5 rounded-xl border transition-all duration-200 cursor-pointer group relative ${
+                        selectedNetwork === net.id
+                          ? 'border-primary bg-primary/10 ring-1 ring-primary/30 shadow-[0_4px_16px_rgba(59,130,246,0.25)] scale-[1.02]'
+                          : 'border-border bg-bg-dark-secondary hover:border-border-hover hover:bg-bg-card-hover'
+                      }`}
                     >
-                      <span className="text-sm font-bold text-text-white font-['Space_Grotesk']">{net.name}</span>
-                      <span className="text-[10px] text-text-muted mt-1 text-center">{net.desc}</span>
+                      <div className="relative mb-2 transition-transform duration-200 group-hover:scale-110">
+                        <NetworkIcon networkId={net.id} size="lg" showBorder />
+                        {selectedNetwork === net.id && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-bg-dark flex items-center justify-center shadow-sm">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className="w-2.5 h-2.5 text-white">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-bold text-text-white font-['Space_Grotesk']">{net.name}</span>
+                      <span className="text-[10px] text-text-muted mt-0.5 text-center line-clamp-1">{net.desc}</span>
                     </button>
                   ))}
                 </div>
@@ -776,7 +754,7 @@ const BuyAirtime: React.FC = () => {
               ) : (
                 <>
                   <div className="space-y-3 pr-1">
-                    {paginatedBeneficiaries.map((b) => (
+                    {paginatedBeneficiaries.map((b: (typeof beneficiaries)[number]) => (
                       <div key={b._id} className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 space-y-3 hover:border-border-hover transition-colors">
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-0.5">
@@ -923,7 +901,10 @@ const BuyAirtime: React.FC = () => {
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 space-y-3">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-text-muted">Mobile Network:</span>
-                  <span className="text-text-white font-semibold uppercase">{selectedNetwork}</span>
+                  <div className="flex items-center gap-1.5">
+                    <NetworkIcon networkId={selectedNetwork} size="xs" />
+                    <span className="text-text-white font-semibold uppercase">{selectedNetwork}</span>
+                  </div>
                 </div>
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-text-muted">Recipient Phone:</span>

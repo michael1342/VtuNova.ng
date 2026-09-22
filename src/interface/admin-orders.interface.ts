@@ -1,0 +1,22 @@
+export type AdminOrderStatus = 'Success' | 'Pending' | 'Failed' | 'Reversed';
+export type AdminNetwork = 'MTN' | 'Airtel' | 'Glo' | '9mobile';
+export type CableProviderName = 'DSTV' | 'GOtv' | 'Startimes';
+
+export interface OrderTimeline { created: string; submitted?: string; validated?: string; processing?: string; delivered?: string; activated?: string; tokenGenerated?: string; completed: string; }
+export interface AirtimeOrder { id: string; reference: string; user: string; email: string; phone: string; network: AdminNetwork; recipient: string; amount: number; costPrice: number; profit: number; status: AdminOrderStatus; date: string; time: string; provider: string; service?: string; walletBefore: number; walletAfter: number; failureReason?: string; assignedAdmin?: string; timeline: { created: string; submitted: string; delivered: string; completed: string; }; }
+export interface DataOrder { id: string; reference: string; user: string; email: string; phone: string; network: AdminNetwork; recipient: string; amount: number; costPrice: number; profit: number; status: AdminOrderStatus; date: string; time: string; provider: string; walletBefore: number; walletAfter: number; bundleName: string; bundleCategory: 'Daily' | 'Weekly' | 'Monthly' | 'SME' | 'Corporate' | 'Unlimited'; validity: string; failureReason?: string; assignedAdmin?: string; timeline: { created: string; submitted: string; processing: string; delivered: string; completed: string; }; }
+export interface CableCustomer { name: string; email: string; phone: string; avatarInitials: string; }
+export interface CableSubscription { id: string; reference: string; customer: CableCustomer; provider: CableProviderName; smartCardNumber: string; packageName: string; amount: number; costPrice: number; profit: number; status: AdminOrderStatus; date: string; time: string; duration: string; activationStatus: string; walletBefore: number; walletAfter: number; failureReason?: string; assignedAdmin?: string; timeline: { created: string; validated: string; processing: string; activated: string; completed: string; }; }
+export interface CableProvider { name: CableProviderName; subCount: number; revenue: number; successRate: number; avgTime: string; }
+export interface PackagePlan { name: string; provider: CableProviderName; orders: number; revenue: number; growth: string; }
+export interface SubscriptionStats { totalSubscriptions: number; volume: number; successRate: number; failedRate: number; pendingRate: number; profit: number; }
+export interface ElectricityCustomer { name: string; email: string; phone: string; avatarInitials: string; }
+export type ElectricityProvider = 'Ikeja Electric' | 'Eko Electric' | 'Abuja Electric' | 'Ibadan Electric' | 'Benin Electric' | 'Enugu Electric' | 'Jos Electric' | 'Kaduna Electric' | 'Kano Electric' | 'Port Harcourt Electric' | 'Yola Electric';
+export interface ElectricityPayment { id: string; reference: string; customer: ElectricityCustomer; provider: ElectricityProvider; providerName?: string; meterNumber: string; meterType: 'Prepaid' | 'Postpaid'; customerName: string; customerAddress: string; amount: number; costPrice: number; profit: number; token: string; unitsPurchased: number; tokenDeliveryStatus: 'Delivered' | 'Pending' | 'Failed'; status: AdminOrderStatus; date: string; time: string; walletBefore: number; walletAfter: number; failureReason?: string; assignedAdmin?: string; timeline: { created: string; validated: string; processing: string; tokenGenerated: string; completed: string; }; }
+export interface ProviderStats { name: string; txCount: number; revenue: number; successRate: number; avgProcessingTime: string; color: string; }
+export interface TokenRecord { token: string; meter: string; units: number; date: string; status: 'Active' | 'Used' | 'Pending'; }
+export interface AirtimeNetworkStats { name: AdminNetwork; volume: number; successRate: number; avgProcessingTime: string; color: string; icon: string; }
+export interface DataNetworkStats { name: AdminNetwork; orders: number; revenue: number; successRate: number; avgDeliveryTime: string; color: string; }
+export interface PopularPlan { name: string; network: AdminNetwork; orders: number; revenue: number; trend: string; badgeColor: string; }
+export interface AdminAlertLog { id: string; title: string; desc: string; severity: 'Low' | 'Medium' | 'High' | 'Critical'; timestamp: string; }
+export interface AdminActivityEvent { id: number; text: string; time: string; icon: string; color: string; }

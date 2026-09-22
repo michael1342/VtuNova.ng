@@ -27,27 +27,9 @@ import {
   // BanknotesIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
+import type { ReferralActivityEvent, ReferralUser } from '../../interface/user-page.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface ReferralUser {
-  id: string;
-  name: string;
-  email: string;
-  joinDate: string;
-  transactions: number;
-  status: 'Active' | 'Pending' | 'Inactive';
-  rewardEarned: number;
-}
-
-interface ActivityEvent {
-  id: string;
-  type: 'joined' | 'credited' | 'active' | 'bonus';
-  title: string;
-  description: string;
-  time: string;
-  amount?: number;
-}
-
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
 const MOCK_REFERRALS: ReferralUser[] = [
   { id: '1', name: 'Michael A.', email: 'm.adebayo@gmail.com', joinDate: '12 Jun 2026', transactions: 14, status: 'Active', rewardEarned: 3000 },
@@ -61,7 +43,7 @@ const MOCK_REFERRALS: ReferralUser[] = [
   { id: '9', name: 'Precious U.', email: 'precious.u@gmail.com', joinDate: '24 Apr 2026', transactions: 11, status: 'Active', rewardEarned: 2500 },
 ];
 
-const MOCK_ACTIVITY: ActivityEvent[] = [
+const MOCK_ACTIVITY: ReferralActivityEvent[] = [
   { id: 'act-1', type: 'credited', title: 'Reward Credited', description: '₦3,000 added for Michael A. becoming active.', time: '2 hours ago', amount: 3000 },
   { id: 'act-2', type: 'active', title: 'Referral Became Active', description: 'Ada C. made their first wallet funding.', time: '5 hours ago' },
   { id: 'act-3', type: 'joined', title: 'Referral Joined', description: 'Tunde B. registered using your referral code.', time: '1 day ago' },

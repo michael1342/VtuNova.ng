@@ -1,148 +1,31 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { totalTransactions, totalSuccessfulTransactions, totalAmountSpent, totalAmountReceived } from '../../utils/transactions';
 import { formatAmount, formatId, formatDate } from '../../utils/formatter';
-import { getTransactions } from '../../api/user';
+import { getTransactions, getTransactionChart, generateTransactionReceipt } from '../../api/user';
+import { type Transaction, type TransactionReceipt, type MonthlyChartItem } from '../../interface/user.interface';
 import { useAuth } from '../../context/AuthContext';
-const transaction = await getTransactions()
 
-
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-interface Transaction {
-  id: string;
-  refNo: string;
-  service: string;
-  recipient: string;
-  amount: number;
-  fee: number;
-  status: 'Success' | 'Pending' | 'Failed' | 'Reversed';
-  date: string;
-  time: string;
-  paymentMethod: string;
-  balanceBefore: number;
-  balanceAfter: number;
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return 'Just now';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffInSeconds < 60) return 'Just now';
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}d ago`;
+  return date.toLocaleDateString('en-NG', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const initialTransactions = transaction.transactions
-
-// Initial Data representing realistic logs
-// const initialTransactions: Transaction[] = [
-//   {
-//     id: 'SWT-2026-00124',
-//     refNo: 'TXN9283749201',
-//     service: 'Airtime',
-//     recipient: '08012345678',
-//     amount: 1000,
-//     fee: 0,
-//     status: 'Success',
-//     date: '12 Jun 2026',
-//     time: '10:24 AM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 151000,
-//     balanceAfter: 150000,
-//   },
-//   {
-//     id: 'SWT-2026-00125',
-//     refNo: 'TXN8374829103',
-//     service: 'Electricity',
-//     recipient: 'Meter 123456789',
-//     amount: 5000,
-//     fee: 100,
-//     status: 'Pending',
-//     date: '12 Jun 2026',
-//     time: '09:15 AM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 156100,
-//     balanceAfter: 151000,
-//   },
-//   {
-//     id: 'SWT-2026-00126',
-//     refNo: 'TXN3748291034',
-//     service: 'Cable TV',
-//     recipient: 'DSTV 1234567890',
-//     amount: 7500,
-//     fee: 0,
-//     status: 'Success',
-//     date: '11 Jun 2026',
-//     time: '01:20 PM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 163600,
-//     balanceAfter: 156100,
-//   },
-//   {
-//     id: 'SWT-2026-00127',
-//     refNo: 'TXN2837482910',
-//     service: 'Wallet Funding',
-//     recipient: 'Wallet Balance',
-//     amount: 15000,
-//     fee: 0,
-//     status: 'Success',
-//     date: '11 Jun 2026',
-//     time: '10:42 AM',
-//     paymentMethod: 'Bank Transfer (Sterling)',
-//     balanceBefore: 148600,
-//     balanceAfter: 163600,
-//   },
-//   {
-//     id: 'SWT-2026-00128',
-//     refNo: 'TXN1928374810',
-//     service: 'Data',
-//     recipient: '09011951195',
-//     amount: 2000,
-//     fee: 0,
-//     status: 'Success',
-//     date: '10 Jun 2026',
-//     time: '06:12 PM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 150600,
-//     balanceAfter: 148600,
-//   },
-//   {
-//     id: 'SWT-2026-00129',
-//     refNo: 'TXN0928374819',
-//     service: 'Airtime',
-//     recipient: '08108642864',
-//     amount: 500,
-//     fee: 0,
-//     status: 'Failed',
-//     date: '09 Jun 2026',
-//     time: '08:30 AM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 150600,
-//     balanceAfter: 150600,
-//   },
-//   {
-//     id: 'SWT-2026-00130',
-//     refNo: 'TXN9182736450',
-//     service: 'Wallet Funding',
-//     recipient: 'Wallet Balance',
-//     amount: 5000,
-//     fee: 0,
-//     status: 'Success',
-//     date: '08 Jun 2026',
-//     time: '04:15 PM',
-//     paymentMethod: 'Card (Mastercard)',
-//     balanceBefore: 145600,
-//     balanceAfter: 150600,
-//   },
-//   {
-//     id: 'SWT-2026-00131',
-//     refNo: 'TXN8172635449',
-//     service: 'Electricity',
-//     recipient: 'Meter 109876543',
-//     amount: 10000,
-//     fee: 100,
-//     status: 'Reversed',
-//     date: '07 Jun 2026',
-//     time: '11:05 AM',
-//     paymentMethod: 'Wallet Balance',
-//     balanceBefore: 145600,
-//     balanceAfter: 145600,
-//   },
-// ];
-
 const Transactions = () => {
+  // Transactions State
+  const [transactionsList, setTransactionsList] = useState<Transaction[]>([]);
+  const [chartData, setChartData] = useState<MonthlyChartItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
   // Filters State
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
@@ -161,7 +44,203 @@ const Transactions = () => {
   const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null);
   const [showDrawer, setShowDrawer] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
-  const [receiptTransaction, setReceiptTransaction] = useState<Transaction | null>(null);
+  const [receiptTransaction, setReceiptTransaction] = useState<TransactionReceipt | Transaction | null>(null);
+  const [isReceiptLoading, setIsReceiptLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setIsLoading(true);
+      try {
+        const [txnRes, chartRes] = await Promise.allSettled([
+          getTransactions(),
+          getTransactionChart(new Date().getFullYear()),
+        ]);
+
+        if (txnRes.status === 'fulfilled' && txnRes.value?.transactions) {
+          setTransactionsList(txnRes.value.transactions);
+        }
+        if (chartRes.status === 'fulfilled' && chartRes.value?.data?.monthlyData) {
+          setChartData(chartRes.value.data.monthlyData);
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAllData();
+  }, []);
+
+  // Dynamic Overview Stats
+  const stats = useMemo(() => {
+    const totalCount = transactionsList.length;
+
+    // Successful transactions
+    const successfulTxns = transactionsList.filter(
+      (t) => t.status?.toLowerCase() === 'success' || t.status?.toLowerCase() === 'delivered'
+    );
+
+    // Total spent (purchases, excluding deposits)
+    const purchases = successfulTxns.filter(
+      (t) =>
+        t.service?.toLowerCase() !== 'deposit' &&
+        t.service?.toLowerCase() !== 'fund' &&
+        t.service?.toLowerCase() !== 'wallet funding'
+    );
+    const totalSpent = purchases.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+    // Total funding / deposits
+    const fundings = successfulTxns.filter(
+      (t) =>
+        t.service?.toLowerCase() === 'deposit' ||
+        t.service?.toLowerCase() === 'fund' ||
+        t.service?.toLowerCase() === 'wallet funding'
+    );
+    const totalFunded = fundings.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+    const successRate = totalCount > 0 ? ((successfulTxns.length / totalCount) * 100).toFixed(1) : '100';
+
+    return {
+      totalCount,
+      totalSpent,
+      totalSuccessful: successfulTxns.length,
+      successRate,
+      totalFunded,
+    };
+  }, [transactionsList]);
+
+  // Dynamic Monthly Spending Chart Calculation
+  const monthlySpendingList = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    if (chartData && chartData.length > 0) {
+      const maxVal = Math.max(...chartData.map((d) => d.totalAmount || d.successfulAmount || 0), 1);
+      return chartData.map((d) => {
+        const amt = d.successfulAmount || d.totalAmount || 0;
+        return {
+          month: d.shortMonth || monthNames[d.month - 1] || `${d.month}`,
+          amount: amt,
+          count: d.totalTransactions || 0,
+          val: maxVal > 0 && amt > 0 ? Math.max(Math.round((amt / maxVal) * 100), 8) : 4,
+        };
+      });
+    }
+
+    // Fallback computed from transactionsList
+    const monthlyMap: Record<number, { amount: number; count: number }> = {};
+    for (let i = 0; i < 12; i++) {
+      monthlyMap[i] = { amount: 0, count: 0 };
+    }
+
+    transactionsList.forEach((tx) => {
+      const dateStr = tx.paidAt || tx.createdAt || tx.date;
+      if (dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d.getTime())) {
+          const m = d.getMonth();
+          const amt = Number(tx.amount) || 0;
+          const isSuccess = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'delivered';
+          if (isSuccess && monthlyMap[m]) {
+            monthlyMap[m].amount += amt;
+            monthlyMap[m].count += 1;
+          }
+        }
+      }
+    });
+
+    const maxAmt = Math.max(...Object.values(monthlyMap).map((m) => m.amount), 1);
+    return monthNames.map((name, idx) => {
+      const item = monthlyMap[idx] || { amount: 0, count: 0 };
+      return {
+        month: name,
+        amount: item.amount,
+        count: item.count,
+        val: maxAmt > 0 && item.amount > 0 ? Math.max(Math.round((item.amount / maxAmt) * 100), 8) : 4,
+      };
+    });
+  }, [chartData, transactionsList]);
+
+  // Dynamic Service Breakdown & Insights Calculation
+  const { serviceBreakdown, topService, highestTxn, avgSpending } = useMemo(() => {
+    const categories: Record<string, { label: string; amount: number; count: number; bg: string }> = {
+      Airtime: { label: 'Airtime', amount: 0, count: 0, bg: 'bg-accent-orange' },
+      Data: { label: 'Data', amount: 0, count: 0, bg: 'bg-primary' },
+      Electricity: { label: 'Electricity', amount: 0, count: 0, bg: 'bg-accent-green' },
+      'Cable TV': { label: 'Cable TV', amount: 0, count: 0, bg: 'bg-accent-purple' },
+      'Wallet Funding': { label: 'Wallet Funding', amount: 0, count: 0, bg: 'bg-pink-500' },
+    };
+
+    let totalServiceSpend = 0;
+    let highest: Transaction | null = null;
+
+    transactionsList.forEach((tx) => {
+      const s = (tx.service || '').toLowerCase();
+      const amt = Number(tx.amount) || 0;
+      const isSuccess = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'delivered';
+
+      let key = 'Airtime';
+      if (s.includes('airtime')) key = 'Airtime';
+      else if (s.includes('data')) key = 'Data';
+      else if (s.includes('elect')) key = 'Electricity';
+      else if (s.includes('cable') || s.includes('tv')) key = 'Cable TV';
+      else if (s.includes('deposit') || s.includes('fund') || s.includes('wallet')) key = 'Wallet Funding';
+      else key = 'Data';
+
+      if (categories[key]) {
+        categories[key].count += 1;
+        if (isSuccess) {
+          categories[key].amount += amt;
+          totalServiceSpend += amt;
+        }
+      }
+
+      if (!highest || amt > (highest.amount || 0)) {
+        highest = tx;
+      }
+    });
+
+    const breakdown = Object.values(categories).map((item) => {
+      const pct = totalServiceSpend > 0 ? Math.round((item.amount / totalServiceSpend) * 100) : 0;
+      return {
+        ...item,
+        val: `${pct}%`,
+        amt: formatAmount(item.amount, true) || `₦${item.amount.toLocaleString()}`,
+        pct,
+      };
+    });
+
+    const sortedBySpend = [...breakdown].sort((a, b) => b.amount - a.amount);
+    const top = sortedBySpend[0] && sortedBySpend[0].amount > 0 ? sortedBySpend[0] : breakdown[0];
+
+    const successfulPurchases = transactionsList.filter(
+      (t) =>
+        (t.status?.toLowerCase() === 'success' || t.status?.toLowerCase() === 'delivered') &&
+        t.service?.toLowerCase() !== 'deposit' &&
+        t.service?.toLowerCase() !== 'fund'
+    );
+    const avg =
+      successfulPurchases.length > 0
+        ? Math.round(totalServiceSpend / successfulPurchases.length)
+        : 0;
+
+    return {
+      serviceBreakdown: breakdown,
+      topService: top,
+      highestTxn: highest as Transaction | null,
+      avgSpending: avg,
+    };
+  }, [transactionsList]);
+
+  // Recent Activity Timeline from live transactions
+  const recentActivities = useMemo(() => {
+    return [...transactionsList]
+      .sort((a, b) => {
+        const dateA = a.paidAt || a.createdAt || a.date || '';
+        const dateB = b.paidAt || b.createdAt || b.date || '';
+        return dateB.localeCompare(dateA);
+      })
+      .slice(0, 4);
+  }, [transactionsList]);
 
   // Filter handlers
   const handleTypeToggle = (type: string) => {
@@ -182,12 +261,14 @@ const Transactions = () => {
 
   // Filter calculation
   const filteredTransactions = useMemo(() => {
-    return initialTransactions.filter((txn) => {
+    return transactionsList.filter((txn) => {
       // Search Match
       const matchesSearch =
         txn._id?.toLowerCase().includes(search.toLowerCase()) ||
+        txn.id?.toLowerCase().includes(search.toLowerCase()) ||
         txn.recipient?.toLowerCase().includes(search.toLowerCase()) ||
-        txn.refNo?.toLowerCase().includes(search.toLowerCase());
+        txn.refNo?.toLowerCase().includes(search.toLowerCase()) ||
+        txn.reference?.toLowerCase().includes(search.toLowerCase());
 
       // Type Match
       const matchesType =
@@ -203,7 +284,7 @@ const Transactions = () => {
 
       return matchesSearch && matchesType && matchesStatus && matchesMin && matchesMax;
     });
-  }, [search, selectedTypes, selectedStatus, minAmount, maxAmount]);
+  }, [transactionsList, search, selectedTypes, selectedStatus, minAmount, maxAmount]);
 
   // Sorting calculation
   const sortedTransactions = useMemo(() => {
@@ -211,10 +292,12 @@ const Transactions = () => {
       if (sortBy === 'amount') {
         return sortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount;
       }
-      // Date sort (simple lexicographical for demo logs)
+      // Date sort
+      const dateA = a.paidAt || a.createdAt || a.date || '';
+      const dateB = b.paidAt || b.createdAt || b.date || '';
       return sortOrder === 'asc'
-        ? a._id?.localeCompare(b.id)
-        : b._id?.localeCompare(a.id);
+        ? dateA.localeCompare(dateB)
+        : dateB.localeCompare(dateA);
     });
   }, [filteredTransactions, sortBy, sortOrder]);
 
@@ -238,7 +321,7 @@ const Transactions = () => {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedRows(paginatedTransactions.map((t) => t.id));
+      setSelectedRows(paginatedTransactions.map((t) => (t._id || t.id || '')));
     } else {
       setSelectedRows([]);
     }
@@ -256,10 +339,27 @@ const Transactions = () => {
     setShowDrawer(true);
   };
 
-  const triggerReceipt = (txn: Transaction, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const triggerReceipt = async (txn: Transaction, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setReceiptTransaction(txn);
     setShowReceipt(true);
+    const txId = txn._id || txn.id;
+    if (txId) {
+      setIsReceiptLoading(true);
+      try {
+        const response = await generateTransactionReceipt(txId);
+        if (response && response.success) {
+          const receiptData = response.receipt || response.data || response.transaction;
+          if (receiptData) {
+            setReceiptTransaction(receiptData);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to generate receipt from API:', err);
+      } finally {
+        setIsReceiptLoading(false);
+      }
+    }
   };
 
   
@@ -298,10 +398,12 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalTransactions(), false)}</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">
+                {stats.totalCount.toLocaleString()}
+              </span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
-                <span>+12.4%</span>
-                <span className="text-text-muted font-normal">this month</span>
+                <span>{stats.totalSuccessful} completed</span>
+                <span className="text-text-muted font-normal">all-time</span>
               </div>
             </div>
             {/* Sparkline */}
@@ -323,10 +425,12 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalAmountSpent(), true)}</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">
+                {formatAmount(stats.totalSpent, true) || `₦${stats.totalSpent.toLocaleString()}`}
+              </span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
-                <span>+8.2%</span>
-                <span className="text-text-muted font-normal">vs last month</span>
+                <span>Avg {formatAmount(avgSpending, true)}</span>
+                <span className="text-text-muted font-normal">per purchase</span>
               </div>
             </div>
             {/* Sparkline */}
@@ -348,9 +452,11 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalSuccessfulTransactions(), false)}</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">
+                {stats.totalSuccessful.toLocaleString()}
+              </span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
-                <span>98.6%</span>
+                <span>{stats.successRate}%</span>
                 <span className="text-text-muted font-normal">Success Rate</span>
               </div>
             </div>
@@ -373,10 +479,12 @@ const Transactions = () => {
               </span>
             </div>
             <div className="mt-4">
-              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">{formatAmount(totalAmountReceived(), true)}</span>
+              <span className="text-2xl font-bold text-text-white font-['Space_Grotesk']">
+                {formatAmount(stats.totalFunded, true) || `₦${stats.totalFunded.toLocaleString()}`}
+              </span>
               <div className="flex items-center gap-1 text-[10px] text-accent-green font-semibold mt-1">
-                <span>+15.7%</span>
-                <span className="text-text-muted font-normal">this month</span>
+                <span>Deposited</span>
+                <span className="text-text-muted font-normal">to wallet</span>
               </div>
             </div>
             {/* Sparkline */}
@@ -506,7 +614,7 @@ const Transactions = () => {
                 onClick={() => {
                   const headers = 'Transaction ID,Service,Recipient,Amount,Status,Date,RefNo\n';
                   const rows = sortedTransactions
-                    .map((t) => `${t.id},${t.service},${t.recipient},${t.amount},${t.status},${t.date},${t.refNo}`)
+                    .map((t) => `${t._id || t.id},${t.service},${t.recipient},${t.amount},${t.status},${t.paidAt || t.createdAt || t.date},${t.refNo || t.reference}`)
                     .join('\n');
                   const blob = new Blob([headers + rows], { type: 'text/csv' });
                   const url = window.URL.createObjectURL(blob);
@@ -563,28 +671,28 @@ const Transactions = () => {
                 <tbody className="divide-y divide-border text-text-gray">
                   {paginatedTransactions.map((txn) => (
                     <tr
-                      key={txn.id}
+                      key={txn._id || txn.id}
                       onClick={() => handleRowClick(txn)}
                       className="hover:bg-bg-card-hover transition-colors cursor-pointer group"
                     >
                       <td className="p-4 w-12 text-center" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="checkbox"
-                          checked={selectedRows.includes(txn.id)}
-                          onChange={(e) => handleSelectRow(e, txn.id)}
+                          checked={selectedRows.includes(txn._id || txn.id || '')}
+                          onChange={(e) => handleSelectRow(e, txn._id || txn.id || '')}
                           className="rounded border-border text-primary focus:ring-primary cursor-pointer"
                         />
                       </td>
-                      <td className="p-4 font-bold text-text-white">{formatId(txn._id)}</td>
+                      <td className="p-4 font-bold text-text-white">{formatId(txn._id || txn.id || '')}</td>
                       <td className="p-4 font-semibold text-text-gray">{txn.service}</td>
                       <td className="p-4 text-text-muted font-medium">{txn.recipient ?? 'N/A'}</td>
                       <td className="p-4 font-extrabold text-text-white font-['Space_Grotesk']">
-                        {formatAmount(txn.amount.toLocaleString(), true)}
+                        {formatAmount(txn.amount, true) || `₦${txn.amount?.toLocaleString()}`}
                       </td>
                       <td className="p-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                            txn.status === 'success'
+                            txn.status === 'success' || txn.status === 'delivered'
                               ? 'bg-accent-green-glow border-accent-green text-accent-green'
                               : txn.status === 'pending'
                               ? 'bg-accent-orange-glow border-accent-orange text-accent-orange'
@@ -593,11 +701,11 @@ const Transactions = () => {
                               : 'bg-bg-dark border-border text-text-muted'
                           }`}
                         >
-                          {txn.status}
+                          {txn.status === 'delivered' ? 'Success' : txn.status}
                         </span>
                       </td>
                       <td className="p-4 text-text-muted font-medium">
-                        <span className="text-[10px] opacity-75 ml-1">{formatDate(txn.paidAt)} </span>
+                        <span className="text-[10px] opacity-75 ml-1">{formatDate(txn.paidAt || txn.createdAt || txn.date || '')} </span>
                       </td>
                       <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <button
@@ -621,18 +729,24 @@ const Transactions = () => {
                   </svg>
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-text-white">No transactions found</h4>
+                  <h4 className="text-sm font-bold text-text-white">
+                    {isLoading ? 'Loading transactions...' : 'No transactions found'}
+                  </h4>
                   <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                    Your transaction history will appear here after your first purchase or wallet funding.
+                    {isLoading
+                      ? 'Please wait while we fetch your latest transaction records.'
+                      : 'Your transaction history will appear here after your first purchase or wallet funding.'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="py-2.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-md transition-all"
-                >
-                  Start Using VtuNova
-                </button>
+                {!isLoading && (
+                  <button
+                    type="button"
+                    onClick={handleResetFilters}
+                    className="py-2.5 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-md transition-all"
+                  >
+                    Reset Filters
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -687,26 +801,25 @@ const Transactions = () => {
           
           {/* Chart card container */}
           <div className="lg:col-span-2 bg-bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
-            <h3 className="text-sm font-bold text-text-white font-['Space_Grotesk'] border-b border-border pb-3">Spending Analytics</h3>
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-sm font-bold text-text-white font-['Space_Grotesk']">Spending Analytics</h3>
+              <span className="text-[11px] text-text-muted font-medium">Year {new Date().getFullYear()}</span>
+            </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               
-              {/* SVG Sparkline columns (Monthly Spending Chart) */}
+              {/* Dynamic SVG Sparkline columns (Monthly Spending Chart) */}
               <div className="space-y-3">
-                <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Monthly Spending Chart</span>
-                <div className="h-32 border border-border bg-bg-dark-secondary rounded-xl p-3 flex items-end gap-3 justify-between">
-                  {[
-                    { month: 'Jan', val: 40 },
-                    { month: 'Feb', val: 55 },
-                    { month: 'Mar', val: 75 },
-                    { month: 'Apr', val: 48 },
-                    { month: 'May', val: 90 },
-                    { month: 'Jun', val: 100 },
-                  ].map((item, idx) => (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Monthly Spending Chart</span>
+                  <span className="text-[10px] text-accent-green font-bold">₦{stats.totalSpent.toLocaleString()} Total</span>
+                </div>
+                <div className="h-32 border border-border bg-bg-dark-secondary rounded-xl p-3 flex items-end gap-2 justify-between">
+                  {monthlySpendingList.slice(-6).map((item, idx) => (
                     <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group cursor-pointer">
-                      <div className="w-full bg-primary-glow group-hover:bg-primary rounded-t-md transition-colors relative" style={{ height: `${item.val}%` }}>
-                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-text-white text-bg-dark text-[8px] font-bold px-1 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                          ₦{item.val * 500}
+                      <div className="w-full bg-primary-glow group-hover:bg-primary rounded-t-md transition-all duration-300 relative" style={{ height: `${item.val}%` }}>
+                        <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-text-white text-bg-dark text-[8px] font-bold px-1.5 py-0.5 rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                          ₦{item.amount.toLocaleString()} ({item.count} txns)
                         </span>
                       </div>
                       <span className="text-[9px] text-text-muted font-bold">{item.month}</span>
@@ -715,23 +828,21 @@ const Transactions = () => {
                 </div>
               </div>
 
-              {/* Service Breakdown Chart component */}
+              {/* Dynamic Service Breakdown Chart component */}
               <div className="space-y-3">
-                <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Service Breakdown Chart</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Service Breakdown Chart</span>
+                  <span className="text-[10px] text-text-muted font-semibold">{transactionsList.length} total txns</span>
+                </div>
                 <div className="space-y-2.5">
-                  {[
-                    { label: 'Airtime', val: '25%', bg: 'bg-accent-orange', amt: '₦120k' },
-                    { label: 'Data', val: '35%', bg: 'bg-primary', amt: '₦170k' },
-                    { label: 'Electricity', val: '30%', bg: 'bg-accent-green', amt: '₦145k' },
-                    { label: 'Cable TV', val: '10%', bg: 'bg-accent-purple', amt: '₦50k' },
-                  ].map((serv, idx) => (
+                  {serviceBreakdown.map((serv, idx) => (
                     <div key={idx} className="space-y-1 text-xs">
                       <div className="flex justify-between items-center text-[11px]">
                         <span className="font-semibold text-text-gray">{serv.label}</span>
                         <span className="text-text-muted font-bold">{serv.amt} ({serv.val})</span>
                       </div>
                       <div className="w-full h-2 bg-bg-dark rounded-full overflow-hidden">
-                        <div className={`h-full ${serv.bg}`} style={{ width: serv.val }} />
+                        <div className={`h-full ${serv.bg} transition-all duration-500`} style={{ width: serv.val }} />
                       </div>
                     </div>
                   ))}
@@ -746,20 +857,45 @@ const Transactions = () => {
             <h3 className="text-sm font-bold text-text-white font-['Space_Grotesk'] border-b border-border pb-3">Transaction Insights</h3>
             
             <div className="space-y-3">
-              {[
-                { title: 'Most Purchased Service', value: 'Data Bundles', label: '35% of total budget' },
-                { title: 'Highest Transaction', value: '₦20,000 (Electricity)', label: 'Yesterday • Abuja Electric' },
-                { title: 'Average Daily Spending', value: '₦8,500 / day', label: 'Updated today' },
-                { title: 'Monthly Spending Trend', value: '+12.4% Increase', isGreen: true, label: 'Upward trajectory' },
-              ].map((ins, idx) => (
-                <div key={idx} className="bg-bg-dark-secondary border border-border rounded-xl p-3 space-y-1">
-                  <span className="text-[10px] text-text-muted font-bold block">{ins.title}</span>
-                  <span className={`text-xs font-bold block font-['Space_Grotesk'] ${ins.isGreen ? 'text-accent-green' : 'text-text-white'}`}>
-                    {ins.value}
-                  </span>
-                  <span className="text-[10px] text-text-muted block">{ins.label}</span>
-                </div>
-              ))}
+              <div className="bg-bg-dark-secondary border border-border rounded-xl p-3 space-y-1">
+                <span className="text-[10px] text-text-muted font-bold block">Most Purchased Service</span>
+                <span className="text-xs font-bold block font-['Space_Grotesk'] text-text-white">
+                  {topService?.label || 'Data Bundles'}
+                </span>
+                <span className="text-[10px] text-text-muted block">
+                  {topService?.val ? `${topService.val} of total spend (${topService.amt})` : 'Based on transaction volume'}
+                </span>
+              </div>
+
+              <div className="bg-bg-dark-secondary border border-border rounded-xl p-3 space-y-1">
+                <span className="text-[10px] text-text-muted font-bold block">Highest Transaction</span>
+                <span className="text-xs font-bold block font-['Space_Grotesk'] text-text-white">
+                  {highestTxn ? `${formatAmount(highestTxn.amount, true)} (${highestTxn.service})` : '₦0.00'}
+                </span>
+                <span className="text-[10px] text-text-muted block">
+                  {highestTxn?.paidAt || highestTxn?.createdAt || highestTxn?.date
+                    ? formatRelativeTime(highestTxn.paidAt || highestTxn.createdAt || highestTxn.date)
+                    : 'No recorded payments yet'}
+                </span>
+              </div>
+
+              <div className="bg-bg-dark-secondary border border-border rounded-xl p-3 space-y-1">
+                <span className="text-[10px] text-text-muted font-bold block">Average Spending</span>
+                <span className="text-xs font-bold block font-['Space_Grotesk'] text-text-white">
+                  {formatAmount(avgSpending, true) || `₦${avgSpending.toLocaleString()}`}
+                </span>
+                <span className="text-[10px] text-text-muted block">Per completed transaction</span>
+              </div>
+
+              <div className="bg-bg-dark-secondary border border-border rounded-xl p-3 space-y-1">
+                <span className="text-[10px] text-text-muted font-bold block">Transaction Health</span>
+                <span className="text-xs font-bold block font-['Space_Grotesk'] text-accent-green">
+                  {stats.successRate}% Success Rate
+                </span>
+                <span className="text-[10px] text-text-muted block">
+                  {stats.totalSuccessful} out of {stats.totalCount} successful
+                </span>
+              </div>
             </div>
           </div>
 
@@ -769,43 +905,56 @@ const Transactions = () => {
         <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
           <h3 className="text-sm font-bold text-text-white font-['Space_Grotesk'] border-b border-border pb-3">Recent Activity Timeline</h3>
           
-          <div className="relative border-l-2 border-border pl-6 space-y-6 ml-2 text-xs py-1">
-            {/* item 1 */}
-            <div className="relative">
-              <span className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-accent-green-glow border-2 border-accent-green flex items-center justify-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
-              </span>
-              <div className="space-y-0.5">
-                <span className="font-bold text-text-white">Airtime Purchase Successful</span>
-                <div className="text-[10px] text-text-muted">Today • 10:24 AM</div>
-                <p className="text-text-muted mt-1">₦1,000 airtime sent to MTN line 08012345678</p>
-              </div>
-            </div>
+          {recentActivities.length > 0 ? (
+            <div className="relative border-l-2 border-border pl-6 space-y-6 ml-2 text-xs py-1">
+              {recentActivities.map((tx, idx) => {
+                const isSuccess = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'delivered';
+                const isPending = tx.status?.toLowerCase() === 'pending';
+                const rawDate = tx.paidAt || tx.createdAt || tx.date;
+                const formattedDate = rawDate ? formatRelativeTime(rawDate) : 'Recently';
 
-            {/* item 2 */}
-            <div className="relative">
-              <span className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-accent-green-glow border-2 border-accent-green flex items-center justify-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent-green" />
-              </span>
-              <div className="space-y-0.5">
-                <span className="font-bold text-text-white">Electricity Payment Successful</span>
-                <div className="text-[10px] text-text-muted">Yesterday • 05:45 PM</div>
-                <p className="text-text-muted mt-1">Token generated successfully for Meter number 123456789</p>
-              </div>
+                return (
+                  <div key={tx._id || tx.id || idx} className="relative group cursor-pointer" onClick={() => handleRowClick(tx)}>
+                    <span
+                      className={`absolute -left-[31px] top-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                        isSuccess
+                          ? 'bg-accent-green-glow border-accent-green'
+                          : isPending
+                          ? 'bg-accent-orange-glow border-accent-orange'
+                          : 'bg-red-500/20 border-red-500'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          isSuccess
+                            ? 'bg-accent-green'
+                            : isPending
+                            ? 'bg-accent-orange'
+                            : 'bg-red-500'
+                        }`}
+                      />
+                    </span>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-text-white group-hover:text-primary transition-colors">
+                          {tx.service} {isSuccess ? 'Successful' : isPending ? 'Processing' : (tx.status || 'Failed')}
+                        </span>
+                        <span className="text-[10px] font-bold text-text-white font-['Space_Grotesk']">
+                          {formatAmount(tx.amount, true) || `₦${tx.amount?.toLocaleString()}`}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-text-muted">{formattedDate} • Ref: {tx.refNo || tx.reference || formatId(tx._id || tx.id || '')}</div>
+                      <p className="text-text-muted mt-1">
+                        {tx.description || `${formatAmount(tx.amount, true) || `₦${tx.amount}`} ${tx.service} ${tx.recipient ? `sent to ${tx.recipient}` : ''}`}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* item 3 */}
-            <div className="relative">
-              <span className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-primary-glow border-2 border-primary flex items-center justify-center">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              </span>
-              <div className="space-y-0.5">
-                <span className="font-bold text-text-white">DSTV Subscription Renewed</span>
-                <div className="text-[10px] text-text-muted">Yesterday • 01:20 PM</div>
-                <p className="text-text-muted mt-1">Compact Package activated on Smart Card 1234567890</p>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <p className="text-xs text-text-muted py-4">No recent activity found. Transactions will appear here as they occur.</p>
+          )}
         </div>
 
       </main>
@@ -845,7 +994,7 @@ const Transactions = () => {
                     </div>
                     <span
                       className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
-                        activeTransaction.status === 'Success'
+                        activeTransaction.status === 'Success' || activeTransaction.status === 'delivered'
                           ? 'bg-accent-green-glow border-accent-green text-accent-green'
                           : activeTransaction.status === 'Pending'
                           ? 'bg-accent-orange-glow border-accent-orange text-accent-orange'
@@ -854,7 +1003,7 @@ const Transactions = () => {
                           : 'bg-bg-dark border-border text-text-muted'
                       }`}
                     >
-                      {activeTransaction.status}
+                      {activeTransaction.status === 'delivered' ? 'Success' : activeTransaction.status}
                     </span>
                   </div>
 
@@ -864,7 +1013,7 @@ const Transactions = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-text-muted">Transaction ID</span>
-                        <span className="font-mono font-bold text-text-white">{formatId(activeTransaction._id)}</span>
+                        <span className="font-mono font-bold text-text-white">{formatId(activeTransaction._id ?? activeTransaction.id ?? '')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Reference Number</span>
@@ -872,11 +1021,11 @@ const Transactions = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-muted">Date & Time</span>
-                        <span className="font-semibold text-text-white">{new Date(activeTransaction.paidAt).toLocaleDateString("en-NG", {
+                        <span className="font-semibold text-text-white">{new Date(activeTransaction.paidAt ?? activeTransaction.date ?? new Date().toISOString()).toLocaleDateString("en-NG", {
   day: "2-digit",
   month: "short",
   year: "numeric",
-})} • {new Date(activeTransaction.paidAt).toLocaleTimeString("en-NG", {
+})} • {new Date(activeTransaction.paidAt ?? activeTransaction.date ?? new Date().toISOString()).toLocaleTimeString("en-NG", {
   hour: "2-digit",
   minute: "2-digit",
 })}</span>
@@ -952,99 +1101,206 @@ const Transactions = () => {
       )}
 
       {/* ── Download Receipt Modal ── */}
-     {showReceipt && activeTransaction && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div
-      className="absolute inset-0 bg-bg-dark-secondary/60 backdrop-blur-sm"
-      onClick={() => setShowReceipt(false)}
-    />
+      {showReceipt && (receiptTransaction || activeTransaction) && (() => {
+        const txn = receiptTransaction || activeTransaction!;
+        const rawDate = txn.paidAt || txn.createdAt || txn.date;
+        const formattedDateStr = rawDate
+          ? `${new Date(rawDate).toLocaleDateString("en-NG", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })} • ${new Date(rawDate).toLocaleTimeString("en-NG", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}`
+          : 'N/A';
 
-    <div className="bg-bg-card border border-border rounded-2xl max-w-sm w-full shadow-2xl relative overflow-hidden animate-[fadeIn_.2s_ease]">
-      <div className="p-6 space-y-6 text-xs text-text-gray">
+        const isSuccess =
+          txn.status?.toLowerCase() === 'success' ||
+          txn.status?.toLowerCase() === 'delivered';
+        const isPending = txn.status?.toLowerCase() === 'pending';
 
-        {/* Receipt Branding */}
-        <div className="text-center space-y-1">
-          <span className="text-lg font-extrabold text-primary font-['Space_Grotesk'] tracking-tight">
-            VtuNova
-          </span>
-          <span className="text-[10px] text-text-muted block uppercase tracking-wider font-semibold">
-            Transaction Receipt
-          </span>
-        </div>
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-bg-dark-secondary/70 backdrop-blur-sm"
+              onClick={() => setShowReceipt(false)}
+            />
 
-        {/* Receipt Details */}
-        <div className="border-y border-dashed border-border py-4 space-y-2.5">
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Transaction ID</span>
-            <span className="font-mono font-bold text-text-white">
-              {formatId(activeTransaction._id)}
-            </span>
+            <div className="bg-bg-card border border-border rounded-2xl max-w-md w-full shadow-2xl relative overflow-hidden z-10 animate-[fadeIn_.2s_ease]">
+              {/* Modal Top Bar */}
+              <div className="flex items-center justify-between px-6 pt-5 pb-2 border-b border-border">
+                <span className="text-xs font-bold text-text-muted uppercase tracking-wider">
+                  Transaction Receipt
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowReceipt(false)}
+                  className="p-1 rounded-lg text-text-muted hover:text-text-white hover:bg-bg-card-hover transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5 text-xs text-text-gray max-h-[80vh] overflow-y-auto print:p-0">
+                {/* Receipt Branding & Header */}
+                <div className="text-center space-y-1.5">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary-glow text-primary mb-1">
+                    {isSuccess ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-6 h-6 text-accent-green">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                      </svg>
+                    )}
+                  </div>
+                  <h3 className="text-xl font-extrabold text-text-white font-['Space_Grotesk'] tracking-tight">
+                    VtuNova
+                  </h3>
+                  <span className="text-[11px] text-text-muted block font-medium">
+                    {txn.service} Transaction Receipt
+                  </span>
+                  {isReceiptLoading && (
+                    <span className="inline-block text-[10px] text-primary animate-pulse font-semibold">
+                      Fetching latest receipt details from server...
+                    </span>
+                  )}
+                </div>
+
+                {/* Amount Highlight */}
+                <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 text-center space-y-0.5">
+                  <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">
+                    Total Amount
+                  </span>
+                  <div className="text-2xl font-black text-text-white font-['Space_Grotesk']">
+                    {formatAmount(txn.amount, true) || `₦${txn.amount?.toLocaleString()}`}
+                  </div>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 mt-1 rounded-full text-[10px] font-bold border ${
+                      isSuccess
+                        ? 'bg-accent-green-glow border-accent-green text-accent-green'
+                        : isPending
+                        ? 'bg-accent-orange-glow border-accent-orange text-accent-orange'
+                        : 'bg-red-500/10 border-red-500/30 text-red-400'
+                    }`}
+                  >
+                    {isSuccess ? 'Payment Successful' : isPending ? 'Pending' : (txn.status || 'Failed')}
+                  </span>
+                </div>
+
+                {/* Receipt Details Breakdown */}
+                <div className="border-y border-dashed border-border py-4 space-y-2.5">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-text-muted">Transaction ID</span>
+                    <span className="font-mono font-bold text-text-white text-right">
+                      {formatId(txn._id || txn.id || '')}
+                    </span>
+                  </div>
+
+                  {(txn.refNo || txn.reference) && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-text-muted">Reference</span>
+                      <span className="font-mono text-text-gray text-right">
+                        {txn.refNo || txn.reference}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between gap-4">
+                    <span className="text-text-muted">Service</span>
+                    <span className="font-bold text-text-white text-right">
+                      {txn.service}
+                    </span>
+                  </div>
+
+                  {txn.recipient && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-text-muted">Recipient</span>
+                      <span className="font-medium text-text-white text-right">
+                        {txn.recipient}
+                      </span>
+                    </div>
+                  )}
+
+                  {'token' in txn && txn.token && (
+                    <div className="flex justify-between gap-4 bg-primary/10 p-2 rounded-lg border border-primary/20">
+                      <span className="text-primary font-bold">Electricity Token</span>
+                      <span className="font-mono font-bold text-primary text-right tracking-wider">
+                        {txn.token}
+                      </span>
+                    </div>
+                  )}
+
+                  {'unitsPurchased' in txn && txn.unitsPurchased && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-text-muted">Units Purchased</span>
+                      <span className="font-semibold text-text-white text-right">
+                        {txn.unitsPurchased} kWh
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between gap-4">
+                    <span className="text-text-muted">Date & Time</span>
+                    <span className="font-semibold text-text-white text-right">
+                      {formattedDateStr}
+                    </span>
+                  </div>
+
+                  {(txn.paymentMethod || txn.method) && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-text-muted">Payment Method</span>
+                      <span className="font-medium text-text-white text-right">
+                        {txn.paymentMethod || txn.method}
+                      </span>
+                    </div>
+                  )}
+
+                  {txn.fee !== undefined && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-text-muted">Service Fee</span>
+                      <span className="font-medium text-text-gray text-right">
+                        {txn.fee ? `₦${txn.fee.toLocaleString()}` : 'Free'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Notes & Actions */}
+                <p className="text-[10px] text-text-muted text-center leading-relaxed">
+                  Thank you for using VtuNova. For support inquiries, reach out at{' '}
+                  <span className="text-primary font-medium">help@vtunova.com</span>
+                </p>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="w-4 h-4">
+                      <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                      <path d="M6 14h12v8H6z" />
+                    </svg>
+                    Print / Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowReceipt(false)}
+                    className="px-4 py-2.5 rounded-xl border border-border bg-bg-dark-secondary hover:bg-bg-card-hover text-text-gray font-semibold transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Reference Number</span>
-            <span className="font-mono text-text-gray">
-              {activeTransaction.refNo}
-            </span>
-          </div>
-
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Service</span>
-            <span className="font-bold text-text-white">
-              {activeTransaction.service}
-            </span>
-          </div>
-
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Recipient</span>
-            <span className="font-medium text-text-white">
-              {activeTransaction.recipient}
-            </span>
-          </div>
-
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Date & Time</span>
-            <span className="font-semibold text-text-white">
-              {new Date(activeTransaction.paidAt).toLocaleDateString("en-NG", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-              {" • "}
-              {new Date(activeTransaction.paidAt).toLocaleTimeString("en-NG", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-
-          <div className="flex justify-between gap-4">
-            <span className="text-text-muted">Status</span>
-            <span className="font-bold text-accent-green">
-              {activeTransaction.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Total */}
-        <div className="bg-bg-dark-secondary border border-border rounded-xl p-4 flex justify-between items-center">
-          <span className="text-text-muted font-bold uppercase tracking-wider text-[10px]">
-            Total Paid
-          </span>
-
-          <span className="text-lg font-extrabold text-text-white font-['Space_Grotesk']">
-            ₦{activeTransaction.amount.toLocaleString()}
-          </span>
-        </div>
-
-        <p className="text-[10px] text-text-muted text-center leading-relaxed">
-          Thank you for using VtuNova. For support inquiries, contact
-          help@vtunova.com
-        </p>
-      </div>
-    </div>
-  </div>
-)}
+        );
+      })()}
 
     </div>
   );

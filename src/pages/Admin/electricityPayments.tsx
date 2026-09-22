@@ -27,79 +27,9 @@ import {
   BoltIcon,
   DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
+import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, ElectricityPayment, ElectricityCustomer as Customer, ProviderStats, TokenRecord } from '../../interface/admin-orders.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface Customer {
-  name: string;
-  email: string;
-  phone: string;
-  avatarInitials: string;
-}
-
-export interface ElectricityPayment {
-  id: string;
-  reference: string;
-  customer: Customer;
-  provider: 'Ikeja Electric' | 'Eko Electric' | 'Abuja Electric' | 'Ibadan Electric' | 'Benin Electric' | 'Enugu Electric' | 'Jos Electric' | 'Kaduna Electric' | 'Kano Electric' | 'Port Harcourt Electric' | 'Yola Electric';
-  meterNumber: string;
-  meterType: 'Prepaid' | 'Postpaid';
-  customerName: string;
-  customerAddress: string;
-  amount: number;
-  costPrice: number;
-  profit: number;
-  token: string;
-  unitsPurchased: number;
-  tokenDeliveryStatus: 'Delivered' | 'Pending' | 'Failed';
-  status: 'Success' | 'Pending' | 'Failed' | 'Reversed';
-  date: string;
-  time: string;
-  walletBefore: number;
-  walletAfter: number;
-  failureReason?: string;
-  assignedAdmin?: string;
-  timeline: {
-    created: string;
-    validated: string;
-    processing: string;
-    tokenGenerated: string;
-    completed: string;
-  };
-}
-
-export interface ProviderStats {
-  name: string;
-  txCount: number;
-  revenue: number;
-  successRate: number;
-  avgProcessingTime: string;
-  color: string;
-}
-
-export interface TokenRecord {
-  token: string;
-  meter: string;
-  units: number;
-  date: string;
-  status: 'Active' | 'Used' | 'Pending';
-}
-
-export interface AlertLog {
-  id: string;
-  title: string;
-  desc: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-}
-
-export interface ActivityEvent {
-  id: number;
-  text: string;
-  time: string;
-  icon: string;
-  color: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_PAYMENTS: ElectricityPayment[] = [
   {

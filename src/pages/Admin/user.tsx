@@ -18,44 +18,9 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import type { AlertItem, UserAccount, UserActivityEvent as ActivityEvent } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface UserAccount {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  walletBalance: number;
-  transactionsCount: number;
-  verificationStatus: 'Verified' | 'Pending' | 'Unverified';
-  status: 'Active' | 'Suspended';
-  role: 'User' | 'Agent' | 'Admin';
-  joinedDate: string;
-  emailVerified: boolean;
-  phoneVerified: boolean;
-  identityVerified: boolean;
-  identityDocUrl?: string;
-}
-
-interface ActivityEvent {
-  id: string;
-  userId: string;
-  type: 'registration' | 'login' | 'funding' | 'purchase' | 'profile_update' | 'admin_action';
-  text: string;
-  time: string;
-  icon: string;
-  color: string;
-}
-
-interface AlertItem {
-  id: string;
-  title: string;
-  desc: string;
-  severity: 'high' | 'warning' | 'info';
-  time: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_USERS: UserAccount[] = [
   { id: 'USR-89021', firstName: 'Chidi', lastName: 'Benson', email: 'chidi.b@example.com', phone: '+234 803 445 7821', walletBalance: 150000, transactionsCount: 482, verificationStatus: 'Verified', status: 'Active', role: 'User', joinedDate: '2025-06-12', emailVerified: true, phoneVerified: true, identityVerified: true },

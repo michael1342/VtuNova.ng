@@ -1,16 +1,11 @@
 import http from './http'
 import ApiError from './ApiError'
 import {type vtuData } from '../interface/vtu.interface';
-import { data } from 'react-router-dom';
-import type { promises } from 'dns';
+import type { VtuResponse } from '../interface/api.interface';
 
-type vtuResponse = {
-    success: boolean;
-    error: string;
-    response: any;
-}
+export type { VtuResponse as vtuResponse } from '../interface/api.interface';
 
-export const buyData = async (data: vtuData) : Promise<vtuResponse | undefined > => {
+export const buyData = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const response = await http.post("/vtu/buy-data", {...data})
         if(!response) return 
@@ -23,7 +18,7 @@ export const buyData = async (data: vtuData) : Promise<vtuResponse | undefined >
     }
 }
 
-export const buyAirtime = async (data: vtuData) : Promise<vtuResponse | undefined > => {
+export const buyAirtime = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const response = await http.post("/vtu/buy-airtime", {...data})
         if(!response) return 
@@ -36,9 +31,9 @@ export const buyAirtime = async (data: vtuData) : Promise<vtuResponse | undefine
     }
 }
 
-export const getDataPlans = async (data: vtuData) : Promise<vtuResponse | undefined > => {
+export const getDataPlans = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
-        const response = await http.get(`/vtu?serviceID=${encodeURIComponent(data.serviceID)}`)
+        const response = await http.get(`/vtu?serviceID=${encodeURIComponent(data.serviceID ?? '')}`)
         if(!response) return 
         return {response, success: true, error: ''};
     } catch (err) {
@@ -49,7 +44,7 @@ export const getDataPlans = async (data: vtuData) : Promise<vtuResponse | undefi
     }
 }
 
-export const verifyMeter = async (data: vtuData) : Promise<vtuResponse | undefined> => {
+export const verifyMeter = async (data: vtuData) : Promise<VtuResponse | undefined> => {
     try {
         const response = await http.post("/vtu/verify-meter-number", {...data})
         if(!response) return 
@@ -61,7 +56,7 @@ export const verifyMeter = async (data: vtuData) : Promise<vtuResponse | undefin
     }
 }
 
-export const buyElectricity = async (data: vtuData) : Promise<vtuResponse | undefined > => {
+export const buyElectricity = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const response = await http.post("/vtu/buy-electricity", {...data})
         if(!response) return 

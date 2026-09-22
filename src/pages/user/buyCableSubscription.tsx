@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-interface CablePackage {
-  id: string;
-  name: string;
-  price: number;
-  channels: string;
-}
+import type { CablePackage } from '../../interface/user-page.interface';
 
 const packagesData: Record<string, CablePackage[]> = {
   dstv: [

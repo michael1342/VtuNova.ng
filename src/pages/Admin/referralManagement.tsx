@@ -20,83 +20,9 @@ import {
   ArrowUpRightIcon,
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
+import type { Campaign, FraudRecord, LeaderboardUser, Payout, Referral, ReferralActivityLog as ActivityLog, RewardConfig } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface Referral {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  code: string;
-  invites: number;
-  conversions: number;
-  earnings: number;
-  status: 'Active' | 'Pending' | 'Rewarded' | 'Suspended';
-  joinedDate: string;
-  tier: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
-  campaign: string;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  status: 'Active' | 'Paused' | 'Scheduled' | 'Ended';
-  participants: number;
-  budget: number;
-  spent: number;
-  conversionRate: number;
-  description: string;
-}
-
-export interface RewardConfig {
-  type: 'Fixed Amount' | 'Percentage';
-  value: number;
-  currency: string;
-  maxReward: number;
-  activationThreshold: number;
-  expiryDays: number;
-}
-
-export interface Payout {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  amount: number;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
-  requestedDate: string;
-  campaign: string;
-}
-
-export interface LeaderboardUser {
-  rank: number;
-  name: string;
-  email: string;
-  avatar: string;
-  invites: number;
-  conversions: number;
-  earnings: number;
-}
-
-export interface FraudRecord {
-  id: string;
-  type: 'Duplicate Referrals' | 'Unusual Conversion Activity' | 'Rapid Registrations' | 'Repeated Device Usage';
-  description: string;
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
-  userId: string;
-  userName: string;
-  timestamp: string;
-  status: 'Reviewed' | 'Flagged' | 'Restricted' | 'Pending';
-}
-
-export interface ActivityLog {
-  id: string;
-  event: 'Referral Created' | 'Reward Issued' | 'Campaign Activated' | 'Conversion Completed' | 'Referral Suspended';
-  details: string;
-  adminName: string;
-  timestamp: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_REFERRALS: Referral[] = [
   {

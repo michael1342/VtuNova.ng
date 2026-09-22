@@ -1,12 +1,6 @@
 import React from 'react';
 import compactLogo from '../assets/img/new.png';
-
-interface LogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  showTagline?: boolean;
-  className?: string;
-  collapsed?: boolean;
-}
+import type { LogoProps } from '../interface/components.interface';
 
 const Logo: React.FC<LogoProps> = ({
   size = 'md',

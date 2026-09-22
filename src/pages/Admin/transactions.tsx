@@ -27,55 +27,9 @@ import {
   ClockIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
+import type { AdminTransaction as Transaction, FlaggedTx, RefundRequest } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface Transaction {
-  id: string;
-  reference: string;
-  user: string;
-  email: string;
-  phone: string;
-  service: 'Airtime' | 'Data' | 'Electricity' | 'Cable TV' | 'Wallet Funding';
-  recipient: string;
-  amount: number;
-  fee: number;
-  status: 'Success' | 'Pending' | 'Failed' | 'Reversed';
-  date: string;
-  time: string;
-  provider: string;
-  paymentMethod: 'Wallet' | 'Card' | 'Bank Transfer';
-  walletBefore: number;
-  walletAfter: number;
-  riskScore?: 'Low' | 'Medium' | 'High' | 'Critical';
-  flaggedReason?: string;
-  timeline: {
-    created: string;
-    processing: string;
-    completed: string;
-    updated: string;
-  };
-}
-
-interface RefundRequest {
-  id: string;
-  txId: string;
-  user: string;
-  amount: number;
-  reason: string;
-  submitted: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-}
-
-interface FlaggedTx {
-  id: string;
-  txId: string;
-  user: string;
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
-  reason: string;
-  assignedAdmin: string;
-  status: 'Reviewed' | 'Under Investigation' | 'Suspended';
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_TRANSACTIONS: Transaction[] = [
   {

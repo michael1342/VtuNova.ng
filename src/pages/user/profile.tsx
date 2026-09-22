@@ -30,22 +30,10 @@ import {
   SparklesIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
+import type { ProfileActivityEvent, ToastMessage } from '../../interface/user-page.interface';
 const transactions = await getTransactions()
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface ToastMessage {
-  id: string;
-  message: string;
-  type: 'success' | 'info' | 'danger';
-}
-
-interface ActivityEvent {
-  id: string;
-  type: 'profile' | 'security' | 'wallet' | 'transaction' | 'referral';
-  description: string;
-  time: string;
-}
-
 export default function Profile() {
   const { theme, toggleTheme } = useTheme();
   const { currentUser, accountBalance } = useAuth();
@@ -54,9 +42,6 @@ export default function Profile() {
   const fullName = currentUser
     ? `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim()
     : '';
-  const initials = currentUser
-    ? `${currentUser.firstName?.[0] ?? ''}${currentUser.lastName?.[0] ?? ''}`.toUpperCase()
-    : '?';
   const memberSince = useMemo(() => {
     const d = currentUser?.createdAt ?? currentUser?.joinedDate;
     if (!d) return '—';
@@ -71,6 +56,8 @@ export default function Profile() {
     phone: currentUser?.phone ?? '',
     dob: currentUser?.dateOfBirth ?? '',
     gender: 'male',
+    address: currentUser?.address ?? '',
+    fullName: fullName,
   });
   const [originalFormData, setOriginalFormData] = useState({ ...formData });
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -81,8 +68,8 @@ export default function Profile() {
       const name = `${currentUser.firstName ?? ''} ${currentUser.lastName ?? ''}`.trim();
       setFormData(prev => ({
         ...prev,
-        firstName: currentUser.firstName ,
-        lastName: currentUser.lastName,
+        firstName: currentUser.firstName ?? prev.firstName,
+        lastName: currentUser.lastName ?? prev.lastName,
         email: currentUser.email ?? prev.email,
         phone: currentUser.phone ?? prev.phone,
       }));
@@ -135,7 +122,7 @@ export default function Profile() {
   const referralCode = currentUser?.referralCode ?? '—';
   const referralLink = referralCode !== '—' ? `https://vtunova.com/ref/${referralCode}` : '';
   
-  const [activities, setActivities] = useState<ActivityEvent[]>([
+  const [activities, setActivities] = useState<ProfileActivityEvent[]>([
     { id: 'act-1', type: 'profile', description: 'Profile information updated successfully.', time: '10 mins ago' },
     { id: 'act-2', type: 'security', description: 'Password changed successfully.', time: '2 hours ago' },
     { id: 'act-3', type: 'wallet', description: 'Wallet funded: ₦20,000 via Bank Transfer.', time: 'Today, 8:14 AM' },
@@ -180,7 +167,7 @@ export default function Profile() {
       lastName: formData.lastName,
       email: formData.email,
       phone: formData.phone,
-      dateOfBirth: formData.dob.toISOString(),
+      dateOfBirth: formData.dob,
       gender: formData.gender,
       address: formData.address,
     };
@@ -194,7 +181,7 @@ export default function Profile() {
     triggerToast('Personal details updated successfully!', 'success');
     
     // Add new activity log
-    // const newAct: ActivityEvent = {
+    // const newAct: ProfileActivityEvent = {
     //   id: `act-${Date.now()}`,
     //   type: 'profile',
     //   description: 'Profile information updated successfully.',
@@ -239,7 +226,7 @@ export default function Profile() {
      setPasswords({ current: '', new: '', confirm: '' });
     
     // Log activity
-    // const newAct: ActivityEvent = {
+    // const newAct: ProfileActivityEvent = {
     //   id: `act-${Date.now()}`,
     //   type: 'security',
     //   description: 'Account security password changed.',
@@ -268,24 +255,28 @@ export default function Profile() {
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    const photo = file
+    if (!file) return;
     const formData = new FormData();
 
     formData.append("photo", file);
 
-    const res = await uploadProfilePic(formData);
-    console.log(res?.error)
+    const res = (await uploadProfilePic(formData)) as { success?: boolean; error?: string } | undefined;
+    console.log(res?.error);
     if (file && res?.success) {
       const reader = new FileReader();
       reader.onload = (event) => {
         if (event.target?.result) {
-          setProfilePhoto(`http://localhost:3000/${currentUser?.profilePic?.url}`);
+          const profilePath = typeof currentUser?.profilePic === 'object'
+            ? currentUser.profilePic?.url
+            : currentUser?.profilePic;
+          setProfilePhoto(profilePath ? `http://localhost:3000/${profilePath}` : event.target.result.toString());
           triggerToast('Profile photo updated successfully!', 'success');
         }
       };
       reader.readAsDataURL(file);
     }
   };
+
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray font-sans transition-colors duration-200">
@@ -370,11 +361,17 @@ export default function Profile() {
                 <div className="p-1 rounded-full bg-gradient-to-br from-blue-500 via-cyan-400 to-purple-500 shadow-[0_0_24px_rgba(59,130,246,0.4)]">
                 <div className="w-48 h-48 md:w-48 md:h-48 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 border-4 border-bg-card overflow-hidden flex items-center justify-center text-white text-5xl font-extrabold font-['Space_Grotesk'] shadow-xl">
                     {/* {profilePhoto ? (
-                      <img src={`http://localhost:3000/${currentUser?.profilePic?.url}`} alt="Avatar" className="w-full h-full object-cover" />
+                      <img src={typeof currentUser?.profilePic === 'object' ? `http://localhost:3000/${currentUser.profilePic.url}` : currentUser?.profilePic} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
                       <span>{initials}</span>
                     )} */}
-                      <img src={`http://localhost:3000/${currentUser?.profilePic?.url}`} alt="Avatar" className="w-full h-full object-cover" />
+                      <img
+                        src={typeof currentUser?.profilePic === 'object'
+                          ? (currentUser.profilePic?.url ? `http://localhost:3000/${currentUser.profilePic.url}` : '')
+                          : (currentUser?.profilePic ? `http://localhost:3000/${currentUser.profilePic}` : '')}
+                        alt="Avatar"
+                        className="w-full h-full object-cover"
+                      />
                   </div>
                 </div>
                 {/* Camera overlay on hover */}
@@ -450,7 +447,7 @@ export default function Profile() {
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[115px] flex-1 hover:border-emerald-500/35 transition-colors">
                 <span className="text-[10px] text-text-muted uppercase font-bold tracking-wider">Wallet Bal</span>
                 <span className="text-lg font-extrabold text-emerald-400 font-['Space_Grotesk']">
-                  {formatAmount(accountBalance ?? currentUser?.wallet?.balance ?? 0, true)}
+                  {formatAmount(accountBalance ?? (typeof currentUser?.wallet === 'object' ? currentUser.wallet.balance : 0), true)}
                 </span>
               </div>
               <div className="bg-bg-dark-secondary border border-border rounded-xl p-3.5 flex flex-col justify-between h-20 min-w-[105px] flex-1 hover:border-purple-500/35 transition-colors">

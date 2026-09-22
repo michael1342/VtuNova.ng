@@ -26,7 +26,7 @@ const presetAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 const BuyElectricity = () => {
   const navigate = useNavigate();
   const [selectedDisco, setSelectedDisco] = useState('');
-  const [meterType, setMeterType] = useState<'prepaid' | 'Postpaid'>('prepaid');
+  const [meterType, setMeterType] = useState<'prepaid' | 'Postpaid' | ''>('prepaid');
   const [meterNumber, setMeterNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
@@ -248,7 +248,7 @@ const scrollToTop = () => {
         setErrorMessage(null);
        const token = res?.response?.Vtu?.purchased_code
           console.log(res)
-          setAccountBalance(Math.max(0, accountBalance - activeAmount));
+          setAccountBalance(Math.max(0, (accountBalance ?? 0) - activeAmount));
       //  if (token) return 
       // const rawToken = "Toke-n : -2636-2054-4059-8275-7802";
       scrollToTop();

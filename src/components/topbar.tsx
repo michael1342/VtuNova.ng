@@ -1,7 +1,7 @@
 import { useTheme } from '../context/themeContext';
 import { useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNotifications, type BackendNotification, type BackendTransaction } from '../context/NotificationContext';
+import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import {
   BellIcon,
@@ -13,48 +13,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatAmount } from '../utils/formatter.ts';
 import Badge from './ui/Badge';
-
-interface TopbarProps {
-  mobileMenuOpen: boolean;
-  setMobileMenuOpen: (open: boolean) => void;
-}
-
-// Derive title based on notification and transaction data (matching notifications.tsx)
-function deriveTitle(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.title) return n.title;
-  if (!tx) return 'Notification';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  if (isDeposit) return succeeded ? 'Deposit Successful' : 'Deposit Failed';
-  return succeeded ? `${tx.service ?? 'Purchase'} Successful` : `${tx.service ?? 'Purchase'} Failed`;
-}
-
-// Derive message body
-function deriveMessage(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.message) return n.message;
-  if (!tx) return 'You have a new notification.';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  const amtStr = tx.amount != null ? formatAmount(tx.amount, true) : 'an amount';
-  if (isDeposit) {
-    return succeeded
-      ? `Your deposit of ${amtStr} was completed successfully.`
-      : `Your deposit of ${amtStr} failed. Please try again.`;
-  }
-  return succeeded
-    ? `Your purchase of ${amtStr} via ${tx.service ?? 'service'} was completed successfully.`
-    : `Your purchase of ${amtStr} via ${tx.service ?? 'service'} failed.`;
-}
+import type { TopbarProps } from '../interface/components.interface';
 
 // Derive notification category
-function deriveCategory(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.category) return n.category;
-  if (!tx) return 'system';
-  const svc = tx.service?.toLowerCase() ?? '';
-  if (svc === 'deposit' || svc === 'fund') return 'wallet';
-  return 'transactions';
-}
-
 // Format relative or compact timestamp for topbar preview
 function formatNotificationTime(dateStr?: string): string {
   if (!dateStr) return '';
@@ -81,7 +42,6 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
   const location = useLocation();
   const {
     notifications,
-    transactions,
     unreadCount,
     markAsRead,
     markAllAsRead,
@@ -91,13 +51,6 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { currentUser, accountBalance } = useAuth();
-
-  // Fast lookup map for transactions
-  const txMap = useMemo(() => {
-    const map = new Map<string, BackendTransaction>();
-    (transactions || []).forEach((tx) => map.set(tx._id, tx));
-    return map;
-  }, [transactions]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -304,10 +257,9 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
                   </div>
                 ) : (
                   recentNotifications.map((item) => {
-                    const tx = item.transactionId ? txMap.get(item.transactionId) : undefined;
-                    const title = deriveTitle(item, tx);
-                    const message = deriveMessage(item, tx);
-                    const category = deriveCategory(item, tx);
+                    const title = item.title ?? '';
+                    const message = item.message ?? '';
+                    const category = item.category;
                     const time = formatNotificationTime(item.date);
 
                     return (

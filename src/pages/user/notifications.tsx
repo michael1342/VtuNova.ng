@@ -1,6 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useNotifications, type BackendNotification, type BackendTransaction } from '../../context/NotificationContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { getTransactions } from '../../api/transaction';
+import type { ToastMessage } from '../../interface/user-page.interface';
+import type { BackendNotification } from '../../interface/notification.interface';
+import type { ApiTransaction as Transaction } from '../../interface/api.interface';
 
 import {
   BellIcon,
@@ -22,66 +26,34 @@ import { formatAmount, formatDate, formatId } from '../../utils/formatter';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 
-interface ToastMessage {
-  id: string;
-  message: string;
-  type: 'success' | 'info' | 'danger';
-}
-
-// ─── HELPER: derive display fields from a notification + its matched transaction ─
-function deriveTitle(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.title) return n.title;
-  if (!tx) return 'Notification';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  if (isDeposit) return succeeded ? 'Deposit Successful' : 'Deposit Failed';
-  return succeeded ? `${tx.service ?? 'Purchase'} Successful` : `${tx.service ?? 'Purchase'} Failed`;
-}
-
-function deriveMessage(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.message) return n.message;
-  if (!tx) return 'You have a new notification.';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  const amtStr = tx.amount != null ? formatAmount(tx.amount, true) : 'an amount';
-  if (isDeposit) {
-    return succeeded
-      ? `Your deposit of ${amtStr} was completed successfully.`
-      : `Your deposit of ${amtStr} failed. Please try again.`;
-  }
-  return succeeded
-    ? `Your purchase of ${amtStr} via ${tx.service ?? 'service'} was completed successfully.`
-    : `Your purchase of ${amtStr} via ${tx.service ?? 'service'} failed.`;
-}
-
-function deriveCategory(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.category) return n.category;
-  if (!tx) return 'system';
-  const svc = tx.service?.toLowerCase() ?? '';
-  if (svc === 'deposit' || svc === 'fund') return 'wallet';
-  return 'transactions';
-}
-
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function Notifications() {
   const {
     notifications,
-    transactions,
+    refetch,
     isEmptyState,
     isLoading,
-    setIsEmptyState,
     markAsRead: contextMarkAsRead,
     markAsUnread: contextMarkAsUnread,
     deleteNotification: contextDeleteNotification,
     markAllAsRead: contextMarkAllAsRead,
     clearNotifications: contextClearNotifications,
-    restoreMockNotifications: contextRestoreMockNotifications,
   } = useNotifications();
-  console.log(notifications)
 
-  // Build a fast lookup map: transactionId -> transaction
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  useEffect(() => {
+    getTransactions()
+      .then((result) => setTransactions(result.transactions ?? []))
+      .catch((error) => console.error('Failed to fetch transactions', error));
+  }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
   const txMap = useMemo(() => {
-    const map = new Map<string, BackendTransaction>();
+    const map = new Map<string, Transaction>();
     transactions.forEach((tx) => map.set(tx._id, tx));
     return map;
   }, [transactions]);
@@ -92,6 +64,7 @@ export default function Notifications() {
 
   // Detail Drawer
   const [selectedNotification, setSelectedNotification] = useState<BackendNotification | null>(null);
+  console.log('selectedNotification:', selectedNotification);
 
   // Custom Toast Notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -131,9 +104,9 @@ export default function Notifications() {
     showToast('Notification marked as unread', 'info');
   };
 
-  const deleteNotification = (id: string) => {
-    contextDeleteNotification(id);
-    if (selectedNotification && selectedNotification._id === id) {
+  const deleteNotification = async (id: string) => {
+    await contextDeleteNotification(id);
+    if (selectedNotification?._id === id) {
       setSelectedNotification(null);
     }
     showToast('Notification deleted successfully', 'danger');
@@ -155,11 +128,6 @@ useEffect(() => {
     contextClearNotifications();
     setSelectedNotification(null);
     showToast('All notifications cleared', 'info');
-  };
-
-  const restoreMockNotifications = () => {
-    contextRestoreMockNotifications();
-    showToast('Notifications reloaded', 'success');
   };
 
   const handlePreferenceToggle = (key: keyof typeof preferences) => {
@@ -184,24 +152,24 @@ useEffect(() => {
 
   const transactionAlertCount = useMemo(() => {
     if (isEmptyState) return 0;
-    return notifications.filter((n) => deriveCategory(n, n.transactionId ? txMap.get(n.transactionId) : undefined) === 'transactions').length;
-  }, [notifications, isEmptyState, txMap]);
+    return notifications.filter((n) => n.type === 'transactions').length;
+  }, [notifications, isEmptyState]);
 
   const systemUpdateCount = useMemo(() => {
     if (isEmptyState) return 0;
     return notifications.filter((n) => {
-      const cat = deriveCategory(n, n.transactionId ? txMap.get(n.transactionId) : undefined);
+      const cat = n.type;
       return cat === 'system' || cat === 'security';
     }).length;
-  }, [notifications, isEmptyState, txMap]);
+  }, [notifications, isEmptyState]);
 
   // --- Filtering Notifications ---
   const filteredFeed = useMemo(() => {
     if (isEmptyState) return [];
     return notifications.filter((n) => {
       const tx = n.transactionId ? txMap.get(n.transactionId) : undefined;
-      const title = deriveTitle(n, tx).toLowerCase();
-      const message = deriveMessage(n, tx).toLowerCase();
+      const title = n.title?.toLowerCase() ?? '';
+      const message = n.message?.toLowerCase() ?? '';
       const txId = n.transactionId ?? '';
       const service = tx?.service ?? '';
 
@@ -213,7 +181,7 @@ useEffect(() => {
         txId.toLowerCase().includes(q) ||
         service.toLowerCase().includes(q);
 
-      const cat = deriveCategory(n, tx);
+      const cat = n.category;
       const matchesCategory = categoryFilter === 'All' || cat === categoryFilter;
 
       const matchesStatus =
@@ -233,13 +201,6 @@ const today = todayDate.toISOString().split('T')[0];
 const yesterdayDate = new Date(todayDate);
 yesterdayDate.setDate(yesterdayDate.getDate() - 1);
 const yesterday = yesterdayDate.toISOString().split('T')[0];
-
-const olderDate = new Date(todayDate);
-olderDate.setDate(olderDate.getDate() - 2);
-const older = olderDate.toISOString().split('T')[0];
-
-// console.log({ today, yesterday, older });
-//  console.log(filteredFeed.filter((n) => !n.date?.startsWith(today) && !n.date?.startsWith(yesterday)))
 
     return {
       today: filteredFeed.filter((n) => n.date?.startsWith(today)),
@@ -270,30 +231,6 @@ const older = olderDate.toISOString().split('T')[0];
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray font-sans transition-colors duration-200">
-
-      {/* ── Developer Switcher Banner (Subtle & Premium) ── */}
-      {/* <div className="bg-blue-600/10 border-b border-blue-500/20 py-2 px-6 flex items-center justify-between text-xs text-blue-500">
-        <div className="flex items-center gap-2">
-          <BellIcon className="w-4 h-4 animate-bounce text-blue-500" />
-          <span><strong>Developer Demo Panel:</strong> Simulate states to inspect UI behaviors.</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsEmptyState(!isEmptyState)}
-            className="bg-blue-500 text-white font-semibold rounded-md px-3 py-1 hover:bg-blue-600 transition-colors text-[11px]"
-          >
-            Toggle Empty State ({isEmptyState ? 'Populated Feed' : 'Empty State'})
-          </button>
-          {notifications.length === 0 && !isLoading && (
-            <button
-              onClick={restoreMockNotifications}
-              className="bg-emerald-500 text-white font-semibold rounded-md px-3 py-1 hover:bg-emerald-600 transition-colors text-[11px]"
-            >
-              Reload Alerts
-            </button>
-          )}
-        </div>
-      </div> */}
 
       <div className="p-6 space-y-6 max-w-7xl mx-auto w-full relative">
 
@@ -487,12 +424,7 @@ const older = olderDate.toISOString().split('T')[0];
                   >
                     Go to Dashboard
                   </Link>
-                  <button
-                    onClick={restoreMockNotifications}
-                    className="bg-bg-dark-secondary hover:bg-bg-card-hover border border-border text-text-white font-semibold text-xs rounded-xl px-4 py-2.5 transition-colors"
-                  >
-                    Reload Alerts
-                  </button>
+                  
                 </div>
               </div>
             ) : (
@@ -508,17 +440,16 @@ const older = olderDate.toISOString().split('T')[0];
 
                     <div className="space-y-2">
                       {groupItems.map((item) => {
-                        console.log(item);
-                        const tx = item.transactionId ? txMap.get(item.transactionId) : undefined;
-                        const title = deriveTitle(item, tx);
-                        const message = deriveMessage(item, tx);
-                        const category = deriveCategory(item, tx);
+                        const title = item.title ?? '';
+                        const message = item.message ?? '';
+                        const category = item.category;
+                        const type = item.type;
                         const displayDate = item.date ? formatDate(item.date) : '';
                         const txIdDisplay = item.transactionId ? formatId(item.transactionId) : undefined;
 
                         return (
                           <div
-                            key={item._id}
+                            key={item.type}
                             onClick={() => setSelectedNotification(item)}
                             className={`bg-bg-card border rounded-2xl p-4 flex gap-4 hover:border-border-hover hover:shadow-md cursor-pointer transition-all duration-200 group relative ${item.isRead ? 'border-border' : 'border-blue-500/20 bg-blue-500/[0.02]'
                               }`}
@@ -531,7 +462,7 @@ const older = olderDate.toISOString().split('T')[0];
                             {/* Icon Container */}
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${item.isRead ? 'bg-bg-dark-secondary border-border' : 'bg-blue-500/10 border-blue-500/20'
                               }`}>
-                              {renderCategoryIcon(category)}
+                              {renderCategoryIcon(type)}
                             </div>
 
                             {/* Content */}
@@ -742,8 +673,7 @@ const older = olderDate.toISOString().split('T')[0];
                   <p className="text-[11px] text-text-muted">No recent activity.</p>
                 ) : (
                   notifications.slice(0, 5).map((n, i) => {
-                    const tx = n.transactionId ? txMap.get(n.transactionId) : undefined;
-                    const title = deriveTitle(n, tx);
+                    const title = n.title ?? '';
                     const displayDate = n.date ? formatDate(n.date) : '';
                     return (
                       <div key={n._id ?? i} className="relative">
@@ -770,9 +700,9 @@ const older = olderDate.toISOString().split('T')[0];
       {/* ── DETAIL SLIDE-OUT DRAWER ── */}
       {selectedNotification && (() => {
         const tx = selectedNotification.transactionId ? txMap.get(selectedNotification.transactionId) : undefined;
-        const title = deriveTitle(selectedNotification, tx);
-        const message = deriveMessage(selectedNotification, tx);
-        const category = deriveCategory(selectedNotification, tx);
+        const title = selectedNotification.title ?? 'Account Notification';
+        const message = selectedNotification.message ?? 'You have a new account notification.';
+        const category = selectedNotification.category;
         const txIdDisplay = selectedNotification.transactionId ? formatId(selectedNotification.transactionId) : undefined;
         const displayDate = selectedNotification.date ? formatDate(selectedNotification.date) : '';
         const amountDisplay = tx?.amount != null ? formatAmount(tx.amount, true) : undefined;
@@ -828,13 +758,33 @@ const older = olderDate.toISOString().split('T')[0];
 
                 {/* Related Transaction metadata card */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-text-white">Transaction Logs Info</h4>
+                  <h4 className="text-xs font-bold text-text-white">
+                    {category === 'security' ? 'Security Activity' : 'Transaction Logs Info'}
+                  </h4>
 
                   <div className="bg-bg-dark-secondary rounded-xl p-4 border border-border space-y-2.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-text-muted">Target Service:</span>
-                      <span className="font-semibold text-text-white">{tx?.service ?? 'System Action'}</span>
+                      <span className="text-text-muted">Activity:</span>
+                      <span className="font-semibold text-text-white capitalize">{selectedNotification.type}</span>
                     </div>
+                    {selectedNotification.device && (
+                      <div className="flex justify-between gap-4">
+                        <span className="text-text-muted">Device:</span>
+                        <span className="font-semibold text-text-white text-right break-words">{selectedNotification.device}</span>
+                      </div>
+                    )}
+                    {selectedNotification.ip && (
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">IP Address:</span>
+                        <span className="font-semibold text-text-white font-mono">{selectedNotification.ip}</span>
+                      </div>
+                    )}
+                    {category !== 'security' && (
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Target Service:</span>
+                        <span className="font-semibold text-text-white">{tx?.service ?? 'System Action'}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-text-muted">Transaction ID:</span>
                       <span className="font-semibold text-blue-500 font-mono">{txIdDisplay ?? 'N/A'}</span>

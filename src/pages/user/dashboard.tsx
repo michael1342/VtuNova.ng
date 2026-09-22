@@ -12,48 +12,26 @@ import {
 } from 'recharts';
 import { useAuth } from '../../context/AuthContext';
 import { Link } from 'react-router-dom';
-import { getTransactions, getTransactionChart } from '../../api/user';
+import { getTransactionChart } from '../../api/user';
 import paginate from '../../utils/pagination.ts';
 import { formatAmount } from '../../utils/formatter.ts';
-import useAuthStore from '../../api/store';
-import { useNotifications, type BackendNotification, type BackendTransaction } from '../../context/NotificationContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { getTransactions } from '../../api/transaction';
 import { type MonthlyChartItem } from '../../interface/user.interface';
+import type { BackendNotification } from '../../interface/notification.interface';
+import type { ApiTransaction as Transaction } from '../../interface/api.interface';
+import type { QuickActionProps, StatCardProps } from '../../interface/user-page.interface';
 
 
 // ─── Notification Helpers ─────────────────────────────────────────────────────
 
-function deriveNotificationTitle(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.title) return n.title;
-  if (!tx) return 'Notification';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  if (isDeposit) return succeeded ? 'Deposit Successful' : 'Deposit Failed';
-  return succeeded ? `${tx.service ?? 'Purchase'} Successful` : `${tx.service ?? 'Purchase'} Failed`;
-}
-
-function deriveNotificationDesc(n: BackendNotification, tx?: BackendTransaction): string {
-  if (n.message) return n.message;
-  if (!tx) return 'You have a new update.';
-  const isDeposit = tx.service?.toLowerCase() === 'deposit' || tx.service?.toLowerCase() === 'fund';
-  const succeeded = tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'successful';
-  const amtStr = tx.amount != null ? formatAmount(tx.amount, true) : 'an amount';
-  if (isDeposit) {
-    return succeeded
-      ? `${amtStr} added to wallet balance`
-      : `Deposit of ${amtStr} failed`;
-  }
-  return succeeded
-    ? `${amtStr} ${tx.service ?? 'purchase'} delivered`
-    : `Payment of ${amtStr} failed`;
-}
-
-function deriveNotificationType(n: BackendNotification, tx?: BackendTransaction): 'success' | 'info' | 'warning' {
+function deriveNotificationType(n: BackendNotification, tx?: Transaction): 'success' | 'info' | 'warning' {
   if (tx) {
     const status = tx.status?.toLowerCase();
     if (status === 'failed' || status === 'reversed') return 'warning';
     if (status === 'success' || status === 'successful') return 'success';
   }
-  const cat = n.category?.toLowerCase() || '';
+  const cat = n?.category?.toLowerCase() || '';
   if (cat === 'transactions' || cat === 'wallet') return 'success';
   if (cat === 'promotions' || cat === 'warning') return 'warning';
   return 'info';
@@ -78,15 +56,6 @@ function formatRelativeTime(dateStr?: string): string {
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
-interface StatCardProps {
-  label: string;
-  value: string;
-  change: string;
-  positive: boolean;
-  icon: React.ReactNode;
-  iconBg: string;
-}
-
 const StatCard = ({ label, value, change, positive, icon, iconBg }: StatCardProps) => (
   <div className="bg-bg-card border border-border rounded-xl p-4 flex flex-col gap-3 hover:border-border-hover transition-all duration-200">
     <div className="flex items-center justify-between">
@@ -107,13 +76,6 @@ const StatCard = ({ label, value, change, positive, icon, iconBg }: StatCardProp
 );
 
 // ─── Quick Action Button ──────────────────────────────────────────────────────
-
-interface QuickActionProps {
-  label: string;
-  icon: React.ReactNode;
-  iconBg: string;
-  to: string;
-}
 
 const QuickAction = ({ label, icon, iconBg, to }: QuickActionProps) => (
   <Link
@@ -195,7 +157,7 @@ const ServicePieTooltip = ({ active, payload }: any) => {
 const Dashboard = () => {
   const { currentUser } = useAuth();
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
-  const accountBalance = useAuthStore((state) => state.accountBalance);
+  const {accountBalance} = useAuth()
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 5;
 
@@ -207,15 +169,15 @@ const Dashboard = () => {
   const [chartMetric, setChartMetric] = useState<'transactions' | 'amount'>('transactions');
   const [serviceMetric, setServiceMetric] = useState<'amount' | 'count'>('count');
 
-  const { notifications, transactions, unreadCount, isLoading: isLoadingNotifications, markAsRead } = useNotifications();
+  const { notifications, unreadCount, isLoading: isLoadingNotifications, markAsRead } = useNotifications();
 
   const txMap = useMemo(() => {
-    const map = new Map<string, BackendTransaction>();
-    (transactions || []).forEach((tx) => {
+    const map = new Map<string, Transaction>();
+    (allTransactions || []).forEach((tx) => {
       if (tx._id) map.set(tx._id, tx);
     });
     return map;
-  }, [transactions]);
+  }, [allTransactions]);
 
   const dashboardNotifications = useMemo(() => {
     return (notifications || []).slice(0, 4);
@@ -341,11 +303,15 @@ const Dashboard = () => {
 
 
 
-  const paginatedTransactions = useMemo(() => {
-    return paginate(allTransactions, currentPage, pageSize);
-  }, [allTransactions, currentPage, pageSize]);
+  const recentTransactions = useMemo(() => {
+    return (allTransactions || []).slice(0, 10);
+  }, [allTransactions]);
 
-  const totalPages = Math.ceil(allTransactions.length / pageSize) || 1;
+  const paginatedTransactions = useMemo(() => {
+    return paginate(recentTransactions, currentPage, pageSize);
+  }, [recentTransactions, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(recentTransactions.length / pageSize) || 1;
 
   const handlePaginate = (pageNumber: number) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
@@ -382,7 +348,7 @@ const Dashboard = () => {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
                     <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
                   </svg>
-                  Last login: {currentUser ? new Date(currentUser?.lastLogin).toLocaleTimeString('en-US', {
+                  Last login: {currentUser?.lastLogin ? new Date(currentUser.lastLogin).toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
                     hour12: true
@@ -403,7 +369,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Wallet Balance"
-            value={formatAmount(accountBalance || 0, true)}
+            value={formatAmount(accountBalance || 0, true) ?? ''}
             change="+12.4%"
             positive={true}
             iconBg="bg-blue-500/15"
@@ -439,7 +405,7 @@ const Dashboard = () => {
           />
           <StatCard
             label="Referral Earnings"
-            value={formatAmount(currentUser?.wallet.referralEarnings || '0', true)}
+            value={formatAmount(typeof currentUser?.wallet === 'object' ? currentUser.wallet.referralEarnings || 0 : 0, true) ?? ''}
             change="-8.6%"
             positive={false}
             iconBg="bg-pink-500/15"
@@ -781,8 +747,8 @@ const Dashboard = () => {
             {/* Pagination */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-3 border-t border-border select-none">
               <span className="text-xs text-text-muted">
-                Showing {allTransactions.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
-                {Math.min(currentPage * pageSize, allTransactions.length)} of {allTransactions.length} items
+                Showing {recentTransactions.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to{' '}
+                {Math.min(currentPage * pageSize, recentTransactions.length)} of {recentTransactions.length} items
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -850,12 +816,12 @@ const Dashboard = () => {
                   ))}
                 </div>
               ) : dashboardNotifications.length > 0 ? (
-                dashboardNotifications.map((n) => {
-                  const tx = n.transactionId ? txMap.get(n.transactionId) : undefined;
-                  const title = deriveNotificationTitle(n, tx);
-                  const desc = deriveNotificationDesc(n, tx);
+                dashboardNotifications?.map((n) => {
+                  const tx = n?.transactionId ? txMap.get(n?.transactionId) : undefined;
+                  const title = n.title ?? '';
+                  const desc = n.message ?? '';
                   const type = deriveNotificationType(n, tx);
-                  const time = formatRelativeTime(n.date);
+                  const time = formatRelativeTime(n?.date);
 
                   const iconMap: Record<string, { color: string; bg: string; icon: React.ReactNode }> = {
                     success: {
@@ -894,7 +860,7 @@ const Dashboard = () => {
                       key={n._id}
                       onClick={() => !n.isRead && markAsRead(n._id)}
                       className={`flex items-start gap-3 bg-bg-dark-secondary border border-border rounded-xl p-3 hover:bg-bg-card-hover transition-colors cursor-pointer block ${
-                        !n.isRead ? 'border-primary/30' : ''
+                        !n?.isRead ? 'border-primary/30' : ''
                       }`}
                     >
                       <div className={`w-7 h-7 rounded-lg ${style.bg} ${style.color} flex items-center justify-center shrink-0 mt-0.5`}>
@@ -903,7 +869,7 @@ const Dashboard = () => {
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-text-white flex items-center gap-1.5">
                           <span className="truncate">{title}</span>
-                          {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+                          {!n?.isRead && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                         </div>
                         <div className="text-[11px] text-text-muted mt-0.5 truncate">{desc}</div>
                       </div>

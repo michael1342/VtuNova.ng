@@ -19,95 +19,9 @@ import {
   ShieldExclamationIcon,
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
+import type { AgentPerformance, EscalatedCase, KnowledgeBaseArticle, SLAStatus, SupportActivityLog as ActivityLog, SupportAgent, SupportCustomer as Customer, SupportSystemAlert as SystemAlert, SupportTicket, TicketMessage } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  walletBalance: number;
-  verificationLevel: string;
-  previousTickets: number;
-  referrals: number;
-}
-
-export interface SupportTicket {
-  id: string;
-  customerId: string;
-  customerName: string;
-  customerEmail: string;
-  subject: string;
-  description: string;
-  category: 'Payments' | 'Wallet' | 'Airtime' | 'Data' | 'Electricity' | 'Cable TV' | 'Technical' | 'Account';
-  priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  assignedTo: string;
-  status: 'Open' | 'In Progress' | 'Waiting' | 'Resolved' | 'Closed';
-  updatedDate: string;
-  createdDate: string;
-  tags: string[];
-}
-
-export interface TicketMessage {
-  id: string;
-  sender: 'Customer' | 'Agent' | 'System';
-  senderName: string;
-  message: string;
-  timestamp: string;
-  attachments?: string[];
-}
-
-export interface SupportAgent {
-  id: string;
-  name: string;
-  role: string;
-  activeTickets: number;
-}
-
-export interface SLAStatus {
-  label: string;
-  value: string | number;
-  status: 'Healthy' | 'Warning' | 'Critical';
-}
-
-export interface KnowledgeBaseArticle {
-  id: string;
-  title: string;
-  category: string;
-  summary: string;
-  content: string;
-}
-
-export interface EscalatedCase {
-  ticketId: string;
-  reason: string;
-  assignedTeam: string;
-  priority: 'High' | 'Critical';
-  timeOpen: string;
-}
-
-export interface AgentPerformance {
-  rank: number;
-  name: string;
-  closed: number;
-  avgResolution: string;
-  rating: number;
-}
-
-export interface SystemAlert {
-  id: string;
-  title: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  description: string;
-  timestamp: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  event: string;
-  timestamp: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_CUSTOMERS: Record<string, Customer> = {
   'USR-8890': { id: 'USR-8890', name: 'Michael Anazodo', email: 'michael@example.com', phone: '+234 803 123 4567', walletBalance: 24500, verificationLevel: 'Level 3 (KYC Verified)', previousTickets: 2, referrals: 15 },

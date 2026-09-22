@@ -43,9 +43,15 @@ export interface User {
   identityDocUrl?: string;
   referralCode?: string;
   lastLogin?: string;
+  dateOfBirth?: string;
+  address?: string;
+  profilePic?: string | { url?: string };
+  referrals?: number | unknown[];
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  token?: string;
+  otpId?: string;
 }
 
 export interface UserApiResponse {
@@ -130,6 +136,60 @@ export interface TransactionChartData {
 export interface TransactionChartResponse {
   data?: TransactionChartData;
   success?: boolean;
+  error?: string;
+}
+
+export interface TransactionReceipt {
+  _id?: string;
+  id?: string;
+  transactionId?: string;
+  reference?: string;
+  refNo?: string;
+  service: string;
+  recipient?: string;
+  recipientName?: string;
+  amount: number;
+  fee?: number;
+  totalAmount?: number;
+  status: 'Success' | 'Pending' | 'Failed' | 'Reversed' | 'success' | 'pending' | 'failed' | 'reversed' | 'delivered' | string;
+  paymentMethod?: string;
+  method?: string;
+  channel?: string;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  description?: string;
+  paidAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  date?: string;
+  time?: string;
+  token?: string;
+  unitsPurchased?: number;
+  meterNumber?: string;
+  meterType?: string;
+  network?: string;
+  plan?: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  senderName?: string;
+  user?: {
+    _id?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
+  issuedAt?: string;
+  generatedAt?: string;
+}
+
+export interface GenerateReceiptResponse {
+  success?: boolean;
+  receipt?: TransactionReceipt;
+  data?: TransactionReceipt;
+  transaction?: TransactionReceipt;
+  message?: string;
   error?: string;
 }
 

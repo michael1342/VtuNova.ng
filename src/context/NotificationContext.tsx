@@ -1,70 +1,81 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
-import { getNotifications, clearNotifications as apiClearNotifications, readNotification, deleteNotification as apiDeleteNotification, markOneAsUnread } from '../api/notification.ts';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { getNotifications, clearNotifications as apiClearNotifications, readNotification, readOneNotification, deleteNotification as apiDeleteNotification, markOneAsUnread } from '../api/notification.ts';
+import type { NotificationContextProps } from '../interface/context.interface';
+import type { BackendNotification, RawNotification } from '../interface/notification.interface';
+export type { BackendNotification } from '../interface/notification.interface';
 
 // ─── Backend Shapes ───────────────────────────────────────────────────────────
-export interface BackendNotification {
-  _id: string;
-  category: 'transactions' | 'wallet' | 'security' | 'promotions' | 'system';
-  title?: string;
-  message?: string;
-  date: string;
-  isRead: boolean;
-  transactionId?: string;
-}
+const notificationTypeDetails: Record<string, { category: BackendNotification['category']; title: string; message: string }> = {
+  loginAlert: {
+    category: 'security',
+    title: 'New Login Detected',
+    message: 'A new login was detected on your VtuNova account.',
+  },
+};
 
-export interface BackendTransaction {
-  _id: string;
-  service?: string;
-  amount?: number;
-  status?: string;
-  date?: string;
-  [key: string]: any;
-}
+const normalizeNotification = (raw: RawNotification): BackendNotification => {
+  const notification = raw._doc ?? raw;
+  const type = notification.type ?? 'system';
+  const details = notificationTypeDetails[type] ?? {
+    category: notification.category ?? 'system',
+    title: notification.title ?? 'Account Notification',
+    message: notification.message ?? 'You have a new account notification.',
+  };
+
+  return {
+    _id: notification._id ?? notification.id ?? crypto.randomUUID(),
+    type,
+    category: notification.category ?? details.category,
+    title: notification.title ?? details.title,
+    message: notification.message ?? details.message,
+    date: notification.date ?? new Date().toISOString(),
+    isRead: notification.isRead ?? false,
+    transactionId: notification.transactionId,
+    device: notification.device,
+    ip: notification.ip,
+  };
+};
 
 // ─── Context Shape ────────────────────────────────────────────────────────────
-interface NotificationContextProps {
-  notifications: BackendNotification[];
-  transactions: BackendTransaction[];
-  unreadCount: number;
-  isEmptyState: boolean;
-  isLoading: boolean;
-  setIsEmptyState: React.Dispatch<React.SetStateAction<boolean>>;
-  markAsRead: (id: string) => void;
-  markAsUnread: (id: string) => void;
-  deleteNotification: (id: string) => void;
-  markAllAsRead: () => Promise<void>;
-  clearNotifications: () => void;
-  restoreMockNotifications: () => void;
-  refetch: () => Promise<void>;
-}
-
 const NotificationContext = createContext<NotificationContextProps | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<BackendNotification[]>([]);
-  const [transactions, setTransactions] = useState<BackendTransaction[]>([]);
+
   const [isEmptyState, setIsEmptyState] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const fetchInFlight = useRef<Promise<void> | null>(null);
 
-  const fetchNotifications = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getNotifications();
-      if (result?.success && result.data) {
-        const data = result.data as any;
-        setNotifications(data.notifications ?? []);
-        setTransactions(data.transactions ?? []);
+  const fetchNotifications = useCallback((): Promise<void> => {
+    if (fetchInFlight.current) return fetchInFlight.current;
+
+    const request = (async () => {
+      setIsLoading(true);
+      try {
+        const result = await getNotifications();
+        if (result?.success && result.data) {
+          const data = result.data as unknown;
+          const records = Array.isArray(data)
+            ? data.flatMap((item: any) => item.notifications ?? item)
+            : (data as any).notifications ?? [data];
+          setNotifications(records.map((item: RawNotification) => normalizeNotification(item)));
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications', err);
+        throw new Error('Failed to fetch notifications');
+      } finally {
+        setIsLoading(false);
+        fetchInFlight.current = null;
       }
-    } catch (err) {
-      console.error('Failed to fetch notifications', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    })();
+
+    fetchInFlight.current = request;
+    return request;
+  }, []);
 
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   const unreadCount = useMemo(() => {
     if (isEmptyState) return 0;
@@ -73,14 +84,17 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAsRead = (id: string) => {
     setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, isRead: true } : n))
+      prev.map((notification) => notification._id === id ? { ...notification, isRead: true } : notification)
     );
+    readOneNotification(id).catch((err) => {
+      console.error('Failed to mark notification as read', err);
+    });
   };
 
   const markAsUnread = async (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n._id === id ? { ...n, isRead: false } : n))
-    );
+    // setNotifications((prev) =>
+    //   prev.map((n) => (n._id === id ? { ...n, isRead: false } : n))
+    // );
     try {
       await markOneAsUnread(id);
     } catch (err) {
@@ -88,10 +102,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const deleteNotification = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n._id !== id));
+  const deleteNotification = async (id: string): Promise<void> => {
     try {
-      await apiDeleteNotification(id);
+      const response = await apiDeleteNotification(id);
+     if(response?.success) {
+        setNotifications((prev) => prev.filter((notification) => notification._id !== id));
+     }
     } catch (err) {
       console.error('Failed to delete notification', err);
     }
@@ -104,11 +120,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.error('Failed to mark all as read', err);
     }
     // Optimistic update regardless of API result
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    // setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
   };
 
   const clearNotifications = async () => {
-    setNotifications([]);
+    // setNotifications([]);
     try {
       await apiClearNotifications();
     } catch (err) {
@@ -116,16 +132,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const restoreMockNotifications = () => {
-    fetchNotifications();
-    setIsEmptyState(false);
-  };
-
   return (
     <NotificationContext.Provider
       value={{
         notifications,
-        transactions,
         unreadCount,
         isEmptyState,
         isLoading,
@@ -135,7 +145,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         deleteNotification,
         markAllAsRead,
         clearNotifications,
-        restoreMockNotifications,
         refetch: fetchNotifications,
       }}
     >

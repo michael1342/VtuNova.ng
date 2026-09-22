@@ -5,14 +5,16 @@ import {
   type User,
   type GetTransactionsResponse,
   type UserApiResponse,
-  type TransactionChartResponse
+  type TransactionChartResponse,
+  type GenerateReceiptResponse
 } from "../interface/user.interface";
+import type { PasswordChangePayload } from '../interface/api.interface';
 
-export const getTransactions = async (): Promise<GetTransactionsResponse> => {
+export const getTransactions = async (): Promise<GetTransactionsResponse | any> => {
     try {
         const response = await http.get<GetTransactionsResponse>("/users/get-transactions");
         if (!response) return { transactions: [] };
-        return response;
+        return response as unknown as GetTransactionsResponse;
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message, transactions: [] };
@@ -24,10 +26,10 @@ export const getTransactions = async (): Promise<GetTransactionsResponse> => {
 
 
 
-export const saveBenficiary = async ({ data }: Beneficiary) => {
+export const saveBenficiary = async ({ data }: Beneficiary): Promise<any> => {
     try {
-        const response = http.post("/users/save-beneficiary", { ...data });
-        return response;
+        const response = await http.post("/users/save-beneficiary", { ...data });
+        return response as unknown as TransactionChartResponse;
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message, response: [] };
@@ -40,9 +42,9 @@ export const editBenficiary = async ({ data }: Beneficiary): Promise<any> => {
         // const id = data._id
         // console.log(id)
         // console.log(data)
-        const response = http.patch(`/users/edit-beneficiary/${data._id}`, { ...data });
+        const response = await http.patch(`/users/edit-beneficiary/${data._id}`, { ...data });
         console.log(response)
-        return response;
+        return response as unknown as GenerateReceiptResponse;
     } catch (err) {
         if (err instanceof ApiError) {
             console.log(err.message)
@@ -52,7 +54,7 @@ export const editBenficiary = async ({ data }: Beneficiary): Promise<any> => {
     }
 }
 
-export const getBenficiary = async () => {
+export const getBenficiary = async (): Promise<any> => {
     try {
         const response = await http.get("/users/get-beneficiaries");
         return { data: response, success: true };
@@ -63,9 +65,9 @@ export const getBenficiary = async () => {
     }
 }
 
-export const deleteBeneficiary = async (id: string) => {
+export const deleteBeneficiary = async (id: string): Promise<any> => {
     try {
-        const response = http.delete(`/users/delete-beneficiary/${id}`);
+        const response = await http.delete(`/users/delete-beneficiary/${id}`);
         return response;
     } catch (err) {
         if (err instanceof ApiError) {
@@ -95,7 +97,7 @@ export const editProfile = async (data: User) => {
     }
 }
 
-export const changePassword = async (data: User): Promise<any | undefined>=> {
+export const changePassword = async (data: PasswordChangePayload): Promise<any | undefined>=> {
     try {
         const response = await http.patch<UserApiResponse>("/auth/change-password", {...data})
         if(!response) return 
@@ -110,7 +112,7 @@ export const getTransactionChart = async (year: number = new Date().getFullYear(
     try {
         const response = await http.get<TransactionChartResponse>(`/users/transaction-chart?year=${year}`);
         if (!response) return { success: false, error: 'No data returned' };
-        return response;
+        return response as unknown as TransactionChartResponse;
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message };
@@ -118,3 +120,31 @@ export const getTransactionChart = async (year: number = new Date().getFullYear(
         return { success: false, error: (err as any)?.message || 'Failed to fetch transaction chart data' };
     }
 }
+
+export const generateTransactionReceipt = async (transactionId: string): Promise<GenerateReceiptResponse> => {
+    try {
+        const response = await http.get<GenerateReceiptResponse>(`/users/generate-receipt/${transactionId}`);
+        if (!response) return { success: false, error: 'No data returned' };
+        return response as unknown as GenerateReceiptResponse;
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return { success: false, error: err.message };
+        }
+        return { success: false, error: (err as any)?.message || 'Failed to generate receipt' };
+    }
+}
+
+export const getUser = async (): Promise<UserApiResponse> => {
+    try {
+        const response = await http.get<UserApiResponse>("/auth/profile");
+        if (!response) return { success: false, error: 'No data returned', response: {} as User };
+        console.log(response)
+        return response as unknown as UserApiResponse
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return { success: false, error: err.message, response: {} as User };
+        }
+        return { success: false, error: (err as any)?.message || 'Failed to fetch user data', response: {} as User };
+    }
+}
+    

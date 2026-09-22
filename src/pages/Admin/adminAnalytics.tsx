@@ -22,72 +22,9 @@ import {
   CpuChipIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import type { AnalyticsActivityLog as ActivityLog, AnalyticsOverview, ForecastData, GeographicInsight, Report, RevenueMetric, ServiceAnalytics, AnalyticsSystemAlert as SystemAlert } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface AnalyticsOverview {
-  id: string;
-  label: string;
-  value: string | number;
-  change: string;
-  isPositive: boolean;
-  type: 'money' | 'number' | 'percentage';
-  sparkline: { x: number; y: number }[];
-}
-
-export interface RevenueMetric {
-  name: string;
-  Revenue: number;
-  Profit: number;
-  Expense: number;
-  Growth: number;
-}
-
-export interface ServiceAnalytics {
-  name: string;
-  revenue: number;
-  transactions: number;
-  profit: number;
-  growth: string;
-  successRate: number;
-}
-
-export interface GeographicInsight {
-  region: string;
-  revenue: number;
-  users: number;
-  density: string;
-  percentage: number;
-}
-
-export interface Report {
-  id: string;
-  name: string;
-  createdDate: string;
-  createdBy: string;
-  lastUpdated: string;
-  type: 'Revenue' | 'Transaction' | 'Growth' | 'Service' | 'Custom';
-}
-
-export interface ForecastData {
-  name: string;
-  actual: number;
-  projected: number;
-}
-
-export interface SystemAlert {
-  id: string;
-  title: string;
-  description: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-}
-
-export interface ActivityLog {
-  id: string;
-  event: string;
-  timestamp: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_OVERVIEW: AnalyticsOverview[] = [
   {

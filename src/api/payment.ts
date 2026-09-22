@@ -1,20 +1,16 @@
 import http from './http'
 import ApiError from './ApiError'
 import { type Payment } from '../interface/payment.interface'
+import type { PaymentInitResponse } from '../interface/api.interface'
 
-export interface PaymentInitResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-  response?: any;
-}
+export type { PaymentInitResponse } from '../interface/api.interface'
 
 class PaymentApi {
     reference: string = ''
  
     async initializePayment({ amount }: Payment): Promise<PaymentInitResponse> {
         try {
-            const response: any = await http.post('/paystack/initiate-payment', { amount })
+            const response: any = await http.post('/payments/initiate-payment', { amount })
             console.log(response)
             if (response?.data?.reference) {
                 this.reference = response.data.reference;

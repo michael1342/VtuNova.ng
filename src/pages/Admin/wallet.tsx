@@ -28,57 +28,10 @@ import {
   CreditCardIcon,
   PlusIcon
 } from '@heroicons/react/24/outline';
+import type { AdminActivityEvent as ActivityEvent } from '../../interface/admin-orders.interface';
+import type { PendingAdjustment, SecurityLog, WalletAccount } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface WalletAccount {
-  id: string;
-  user: string;
-  email: string;
-  phone: string;
-  availableBalance: number;
-  reservedBalance: number;
-  totalFunding: number;
-  status: 'Active' | 'Frozen' | 'Restricted';
-  lastActivity: string;
-  joinedDate: string;
-  avatarInitials: string;
-  fundingCount: number;
-  averageFunding: number;
-  largestFunding: number;
-  totalSpending: number;
-  spendingSuccessRate: number;
-}
-
-interface PendingAdjustment {
-  id: string;
-  userId: string;
-  user: string;
-  email: string;
-  actionType: 'Credit' | 'Debit' | 'Refund' | 'Correction';
-  amount: number;
-  reason: string;
-  reference: string;
-  submitted: string;
-  status: 'Pending' | 'Approved' | 'Rejected';
-}
-
-interface SecurityLog {
-  id: string;
-  type: string;
-  details: string;
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-  admin: string;
-}
-
-interface ActivityEvent {
-  id: number;
-  text: string;
-  time: string;
-  icon: string;
-  color: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_WALLETS: WalletAccount[] = [
   {

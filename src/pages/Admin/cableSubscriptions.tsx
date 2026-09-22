@@ -28,84 +28,10 @@ import {
   FlagIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
+import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, CableProvider, CableSubscription, PackagePlan, SubscriptionStats } from '../../interface/admin-orders.interface';
+import type { CableCustomer as Customer } from '../../interface/admin-orders.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface Customer {
-  name: string;
-  email: string;
-  phone: string;
-  avatarInitials: string;
-}
-
-export interface CableSubscription {
-  id: string;
-  reference: string;
-  customer: Customer;
-  provider: 'DSTV' | 'GOtv' | 'Startimes';
-  smartCardNumber: string;
-  packageName: string;
-  amount: number;
-  costPrice: number;
-  profit: number;
-  status: 'Success' | 'Pending' | 'Failed' | 'Reversed';
-  date: string;
-  time: string;
-  duration: string; // e.g. "1 Month"
-  activationStatus: string; // e.g. "Completed" or "Reconciled"
-  walletBefore: number;
-  walletAfter: number;
-  failureReason?: string;
-  assignedAdmin?: string;
-  timeline: {
-    created: string;
-    validated: string;
-    processing: string;
-    activated: string;
-    completed: string;
-  };
-}
-
-export interface CableProvider {
-  name: 'DSTV' | 'GOtv' | 'Startimes';
-  subCount: number;
-  revenue: number;
-  successRate: number;
-  avgTime: string;
-}
-
-export interface PackagePlan {
-  name: string;
-  provider: 'DSTV' | 'GOtv' | 'Startimes';
-  orders: number;
-  revenue: number;
-  growth: string;
-}
-
-export interface SubscriptionStats {
-  totalSubscriptions: number;
-  volume: number;
-  successRate: number;
-  failedRate: number;
-  pendingRate: number;
-  profit: number;
-}
-
-export interface AlertLog {
-  id: string;
-  title: string;
-  desc: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-}
-
-export interface ActivityEvent {
-  id: number;
-  text: string;
-  time: string;
-  icon: string;
-  color: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_SUBSCRIPTIONS: CableSubscription[] = [
   {

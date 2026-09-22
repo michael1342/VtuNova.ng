@@ -26,73 +26,9 @@ import {
   ExclamationTriangleIcon,
   SignalIcon
 } from '@heroicons/react/24/outline';
+import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, DataNetworkStats as NetworkStats, DataOrder, PopularPlan } from '../../interface/admin-orders.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface DataOrder {
-  id: string;
-  reference: string;
-  user: string;
-  email: string;
-  phone: string;
-  network: 'MTN' | 'Airtel' | 'Glo' | '9mobile';
-  recipient: string;
-  bundleName: string;
-  bundleCategory: 'Daily' | 'Weekly' | 'Monthly' | 'SME' | 'Corporate' | 'Unlimited';
-  validity: string;
-  amount: number;
-  costPrice: number;
-  profit: number;
-  status: 'Success' | 'Pending' | 'Failed' | 'Reversed';
-  date: string;
-  time: string;
-  provider: string;
-  walletBefore: number;
-  walletAfter: number;
-  failureReason?: string;
-  assignedAdmin?: string;
-  timeline: {
-    created: string;
-    submitted: string;
-    processing: string;
-    delivered: string;
-    completed: string;
-  };
-}
-
-interface NetworkStats {
-  name: 'MTN' | 'Airtel' | 'Glo' | '9mobile';
-  orders: number;
-  revenue: number;
-  successRate: number;
-  avgDeliveryTime: string;
-  color: string;
-}
-
-interface PopularPlan {
-  name: string;
-  network: 'MTN' | 'Airtel' | 'Glo' | '9mobile';
-  orders: number;
-  revenue: number;
-  trend: string;
-  badgeColor: string;
-}
-
-interface AlertLog {
-  id: string;
-  title: string;
-  desc: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-}
-
-interface ActivityEvent {
-  id: number;
-  text: string;
-  time: string;
-  icon: string;
-  color: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_ORDERS: DataOrder[] = [
   {

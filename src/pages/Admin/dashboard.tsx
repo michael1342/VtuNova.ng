@@ -13,36 +13,9 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import type { AdminDashboardTransaction as Transaction, AlertItem, ServiceData } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-interface Transaction {
-  id: string;
-  user: string;
-  email: string;
-  service: 'Airtime' | 'Data' | 'Electricity' | 'Cable TV';
-  amount: number;
-  status: 'Success' | 'Pending' | 'Failed';
-  time: string;
-  date: string;
-}
-
-interface ServiceData {
-  name: string;
-  volume: number;
-  revenue: number;
-  successRate: number;
-  trend: string;
-  color: string;
-}
-
-interface AlertItem {
-  id: string;
-  title: string;
-  desc: string;
-  severity: 'high' | 'warning' | 'info';
-  time: string;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_TRANSACTIONS: Transaction[] = [
   { id: 'TXN-98201', user: 'Chidi Benson', email: 'chidi.b@example.com', service: 'Electricity', amount: 15000, status: 'Success', time: '14:22:10', date: '2026-06-20' },

@@ -2,8 +2,7 @@ import { useState, Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import { useNavigate } from 'react-router-dom';
-import { ThemeProvider } from '../context/ThemeContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/themeContext';
 
 
 import {
@@ -46,15 +45,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import Badge from './ui/Badge';
 
-import { type ReactNode } from 'react';
-
-type NavItem = {
-  path: string;
-  label: string;
-  icon: ReactNode;
-  activeIcon: ReactNode;
-  category?: string;
-};
+import type { NavItem } from '../interface/components.interface';
 
 const navItems: Record<string, NavItem[]> = {
   user: [
@@ -232,7 +223,6 @@ const Sidebar = () => {
   const [_, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const [collapsed,] = useState(false);
-  const theme = localStorage.getItem("theme")
 
   // type roleProp = {
   //   role: string;

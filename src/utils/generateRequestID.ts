@@ -1,5 +1,3 @@
-import crypto from 'crypto'
-
 export const generateRequestID = (): string => {
   const randomString = Math.random()
     .toString(16)

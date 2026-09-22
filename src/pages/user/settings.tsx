@@ -32,66 +32,10 @@ import {
   CheckIcon,
   ComputerDesktopIcon,
 } from '@heroicons/react/24/outline';
+import type { ThemeContextType } from '../../interface/context.interface';
+import type { ConnectedAccount, DeviceSession, SettingsState, SettingsTab, ToastMessage } from '../../interface/user-page.interface';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-
-type SettingsTab =
-  | 'general'
-  | 'security'
-  | 'notifications'
-  | 'wallet'
-  | 'privacy'
-  | 'connected'
-  | 'support';
-
-interface ToastMessage {
-  id: string;
-  message: string;
-  type: 'success' | 'info' | 'danger';
-}
-
-interface DeviceSession {
-  id: string;
-  browser: string;
-  os: string;
-  lastActive: string;
-  isCurrent: boolean;
-}
-
-interface ConnectedAccount {
-  id: string;
-  name: string;
-  icon: React.ReactNode;
-  connected: boolean;
-  detail: string;
-}
-
-interface SettingsState {
-  language: string;
-  currency: string;
-  dateFormat: string;
-  timeZone: string;
-  twoFactorAuth: boolean;
-  loginAlerts: boolean;
-  transactionAlerts: boolean;
-  walletUpdates: boolean;
-  securityAlerts: boolean;
-  promotions: boolean;
-  emailNotifications: boolean;
-  smsNotifications: boolean;
-  pushNotifications: boolean;
-  autoSaveBeneficiaries: boolean;
-  transactionConfirmation: boolean;
-  walletFundingReminder: boolean;
-  dailyLimit: string;
-  monthlyLimit: string;
-  profileVisibility: boolean;
-  activityVisibility: boolean;
-  analyticsTracking: boolean;
-  personalizedRecommendations: boolean;
-  dataSharing: boolean;
-  preferredContact: string;
-}
 
 const DEFAULT_SETTINGS: SettingsState = {
   language: 'English',
@@ -288,12 +232,6 @@ const SecurityScoreRing = ({ score }: { score: number }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-type ThemeContextType = {
-  theme: string;
-  toggleTheme: () => void;
-  setTheme: React.Dispatch<React.SetStateAction<string>>;
-};
-
 export default function Settings() {
   const { theme, toggleTheme, setTheme } = useTheme() as ThemeContextType;
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');

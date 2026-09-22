@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   ShieldExclamationIcon,
   CpuChipIcon,
-  DocumentTextIcon,
   Cog6ToothIcon,
   LockClosedIcon,
   BellIcon,
@@ -15,128 +14,9 @@ import {
   BanknotesIcon,
   HeartIcon
 } from '@heroicons/react/24/outline';
+import type { FeeConfig, GeneralConfig, HistoryRecord, MaintenanceConfig, NotificationSettings, ProviderConfig, SecurityPolicy, ServiceConfig, SettingsSystemAlert as SystemAlert, SystemConfig, TransactionRules, WalletRules } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface GeneralConfig {
-  platformName: string;
-  platformDesc: string;
-  supportEmail: string;
-  supportPhone: string;
-  currency: string;
-  language: string;
-  timezone: string;
-  logoUrl: string;
-  faviconUrl: string;
-}
-
-export interface ServiceConfig {
-  id: string;
-  name: string;
-  enabled: boolean;
-  maintenanceMessage: string;
-  priority: 'High' | 'Medium' | 'Low';
-  dailyLimit: number;
-}
-
-export interface TransactionRules {
-  minAmount: number;
-  maxAmount: number;
-  dailyLimit: number;
-  retryAttempts: number;
-  timeoutSeconds: number;
-  autoReverse: boolean;
-  requirePin: boolean;
-}
-
-export interface WalletRules {
-  minFunding: number;
-  maxFunding: number;
-  autoRefund: boolean;
-  freezeRules: string;
-  lowBalanceThreshold: number;
-  lockThreshold: number;
-  requireApproval: boolean;
-}
-
-export interface NotificationSettings {
-  enableInApp: boolean;
-  enableEmail: boolean;
-  enableSMS: boolean;
-  enablePush: boolean;
-  retentionDays: number;
-  campaignLimit: number;
-  defaultTemplate: string;
-}
-
-export interface SecurityPolicy {
-  passwordRegex: string;
-  sessionTimeoutMinutes: number;
-  deviceLimit: number;
-  allowApiLogins: boolean;
-  allowedIpList: string;
-  require2faAdmin: boolean;
-  auditLevel: 'Verbose' | 'Standard' | 'Minimal';
-  maxLoginAttempts: number;
-}
-
-export interface ProviderConfig {
-  id: string;
-  type: 'VTU' | 'Electricity' | 'Cable' | 'Payment Gateway';
-  name: string;
-  enabled: boolean;
-  priority: number;
-  healthScore: number;
-  apiKeyPlaceholder: string;
-  environment: 'Production' | 'Sandbox';
-  retryPolicy: string;
-}
-
-export interface FeeConfig {
-  airtimeFeePercent: number;
-  dataFeePercent: number;
-  electricityFeeFlat: number;
-  cableFeeFlat: number;
-  walletFundingFeeFlat: number;
-  referralRewardPercent: number;
-  taxPercent: number;
-}
-
-export interface MaintenanceConfig {
-  enabled: boolean;
-  message: string;
-  allowedRoles: string[];
-  startTime: string;
-  endTime: string;
-  emergencyBanner: string;
-}
-
-export interface SystemConfig {
-  cacheDurationMinutes: number;
-  loggingLevel: 'Debug' | 'Info' | 'Warning' | 'Error';
-  fileUploadLimitMb: number;
-  backupFrequencyHours: number;
-  dataRetentionMonths: number;
-  queueConcurrency: number;
-  environmentLabel: 'Production' | 'Staging' | 'Development';
-}
-
-export interface HistoryRecord {
-  id: string;
-  adminName: string;
-  section: string;
-  action: string;
-  date: string;
-  status: 'Successful' | 'Rolled Back' | 'Pending';
-}
-
-export interface SystemAlert {
-  id: string;
-  title: string;
-  description: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-  timestamp: string;
-}
-
 // ─── INITIAL CONFIGURATIONS ──────────────────────────────────────────────────
 const INITIAL_GENERAL: GeneralConfig = {
   platformName: 'VtuNova Admin Portal',

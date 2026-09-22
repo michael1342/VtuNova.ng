@@ -26,68 +26,9 @@ import {
   ArrowRightIcon,
   PauseIcon
 } from '@heroicons/react/24/outline';
+import type { AudienceInsight, FailedNotification, NotificationActivityLog as ActivityLog, NotificationCampaign, NotificationTemplate } from '../../interface/admin.interface';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-export interface Customer {
-  name: string;
-  email: string;
-}
-
-export interface NotificationCampaign {
-  id: string;
-  title: string;
-  message: string;
-  type: 'Announcement' | 'Transaction Alert' | 'Promotion' | 'Security' | 'System Update';
-  audience: 'All Users' | 'Specific Users' | 'User Segments' | 'Inactive Users' | 'New Users' | 'VIP Users';
-  channels: ('In-App' | 'Email' | 'Push' | 'SMS')[];
-  sentCount: number;
-  status: 'Draft' | 'Scheduled' | 'Sending' | 'Delivered' | 'Failed';
-  date: string;
-  time: string;
-  buttonLabel?: string;
-  buttonUrl?: string;
-  timezone?: string;
-  scheduledTime?: string;
-  timeline: {
-    created?: string;
-    scheduled?: string;
-    sending?: string;
-    delivered?: string;
-    completed?: string;
-  };
-}
-
-export interface FailedNotification {
-  id: string;
-  title: string;
-  recipientCount: number;
-  failureReason: string;
-  retries: number;
-}
-
-export interface NotificationTemplate {
-  id: string;
-  name: string;
-  type: NotificationCampaign['type'];
-  subject: string;
-  body: string;
-  channels: NotificationCampaign['channels'];
-}
-
-export interface ActivityLog {
-  id: string;
-  event: string;
-  adminName: string;
-  timestamp: string;
-}
-
-export interface AudienceInsight {
-  label: string;
-  value: string | number;
-  change: string;
-  isPositive: boolean;
-}
-
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
 const INITIAL_CAMPAIGNS: NotificationCampaign[] = [
   {

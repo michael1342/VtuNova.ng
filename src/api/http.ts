@@ -2,8 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import useAuthStore from "./store";
 import ApiError from "./ApiError";
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||  /* 'https://ftr3lxvw-3000.uks1.devtunnels.ms/api' */ 'http://localhost:3000/api';
+const BASE_URL ='https://vtunova-ng-backend-v1.onrender.com/api' 
 
 const http = axios.create({
   baseURL: BASE_URL,
@@ -86,17 +85,6 @@ http.interceptors.response.use(
         // console.log(refreshError)
       
         useAuthStore.getState().clearAuth();
-
-        window.location.assign("/login?session=expired");
-          //  originalRequest._retry = false;
-        // refreshPromise = null
-
-        return Promise.reject(
-          new ApiError({
-            message: "Your session has expired. Please log in again.",
-            status: 402,
-          })
-        );
       }
     }
 
