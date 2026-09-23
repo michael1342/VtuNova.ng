@@ -43,7 +43,7 @@ const LandingPage = () => {
     <div className="relative w-full overflow-hidden">
       {/* Scroll Progress Bar at the top */}
       <div 
-        className="fixed top-0 left-0 h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-accent-purple z-[1001] transition-all duration-75 shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+        className=""
         style={{ width: `${scrollProgress}%` }}
       />
 
