@@ -1,6 +1,6 @@
 import { createContext, useState, useContext, useCallback } from "react";
 import type { AuthContextType, LoginCredentials, LoginResponse, ProviderProps, RegistrationCredentials } from '../interface/context.interface';
-import type { User } from '../interface/user.interface';
+import type { UserApiResponse } from '../interface/user.interface';
 import http from "../api/http";
 import  ApiError  from "../api/ApiError";
 import  useAuthStore  from "../api/store";
@@ -18,10 +18,11 @@ const AuthContext =
 export function AuthProvider({ children }: ProviderProps) {
   const [isAuthenticated,  setIsAuthenticated]  = useState(false);
   // const currentUser = useAuthStore((state) => state.currentUser);
-  const [currentUser, setCurrentUser] = useState<User | null>(current.response)
-  const [accountBalance, setAccountBalance] = useState<number | null>(() =>
-    typeof currentUser?.wallet === 'object' ? currentUser.wallet.balance : currentUser?.walletBalance ?? 0
-  );
+  const [currentUser, setCurrentUser] = useState<any | null>(current?.user)
+  // const [accountBalance, setAccountBalance] = useState<number | null>(
+  //    currentUser?.wallet?.balance ?? 0
+  // );
+  const accountBalance = currentUser?.wallet?.balance ?? 0
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
   const setOtpId = useAuthStore((state) => state.setOtpId);
@@ -114,7 +115,7 @@ console.log(response)
   // ── Mock Transactions ────────────────────────────────────────────────────────
   
   return (
-  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, setAccountBalance, response: currentUser, user: currentUser}}>
+  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, response: currentUser, user: currentUser}}>
     {children}
   </AuthContext.Provider>
   )

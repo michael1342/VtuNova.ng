@@ -169,7 +169,11 @@ const Dashboard = () => {
   const [chartMetric, setChartMetric] = useState<'transactions' | 'amount'>('transactions');
   const [serviceMetric, setServiceMetric] = useState<'amount' | 'count'>('count');
 
-  const { notifications, unreadCount, isLoading: isLoadingNotifications, markAsRead } = useNotifications();
+  const { notifications, unreadCount, isLoading: isLoadingNotifications, markAsRead, refetch } = useNotifications();
+
+   useEffect(() => {
+    refetch()
+  },[])
 
   const txMap = useMemo(() => {
     const map = new Map<string, Transaction>();

@@ -54,10 +54,13 @@ export interface User {
   otpId?: string;
 }
 
+
 export interface UserApiResponse {
   response: User;
   success: boolean;
   error?: string;
+  user?: User;
+  current?: User
 }
 
 export interface Transaction {

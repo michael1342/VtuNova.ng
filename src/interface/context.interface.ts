@@ -27,7 +27,7 @@ export interface AuthContextType {
   setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
   currentUser: User | null;
   accountBalance: number | null;
-  setAccountBalance: React.Dispatch<React.SetStateAction<number | null>>;
+  // setAccountBalance: React.Dispatch<React.SetStateAction<number | null>>;
   response: User | null;
   user: User | null;
   register: (credentials: RegistrationCredentials) => Promise<any>;
