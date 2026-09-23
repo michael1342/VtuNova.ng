@@ -82,7 +82,7 @@ export const parsePlanVariation = (plan: BackendVariation): FormattedPlan => {
 };
 
 const BuyData: React.FC = () => {
-  const { accountBalance, setAccountBalance } = useAuth();
+  const { accountBalance } = useAuth();
 
   // Selection states
   const [selectedNetwork, setSelectedNetwork] = useState('');
@@ -334,9 +334,6 @@ const BuyData: React.FC = () => {
       console.log('apiBuyData response:', res);
 
       if (res?.success) {
-        if (accountBalance !== null) {
-          setAccountBalance(Math.max(0, accountBalance - selectedPlan.amount));
-        }
         setLoading(false);
         setShowPayModal(false);
         setSuccess(true);

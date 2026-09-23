@@ -30,7 +30,7 @@ const BuyElectricity = () => {
   const [meterNumber, setMeterNumber] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  const { currentUser, accountBalance, setAccountBalance } = useAuth();
+  const { currentUser, accountBalance } = useAuth();
 
   const [amountType, setAmountType] = useState('preset');
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
@@ -247,8 +247,7 @@ const scrollToTop = () => {
         setSuccess(true);
         setErrorMessage(null);
        const token = res?.response?.Vtu?.purchased_code
-          console.log(res)
-          setAccountBalance(Math.max(0, (accountBalance ?? 0) - activeAmount));
+        
       //  if (token) return 
       // const rawToken = "Toke-n : -2636-2054-4059-8275-7802";
       scrollToTop();
