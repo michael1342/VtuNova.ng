@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import useAuthStore from "./store";
 import ApiError from "./ApiError";
+import { REFERRALS_ENABLED } from "../config/features";
 
 const BASE_URL ='https://vtunova-ng-backend-v1.onrender.com/api' 
 
@@ -12,9 +13,16 @@ const http = axios.create({
 
 let refreshPromise: Promise<string> | null = null;
 
-// Attach access token
+// Attach access token and guard disabled features
 http.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Guard against referral API requests while referral feature is coming soon
+    if (!REFERRALS_ENABLED && config.url && /referral/i.test(config.url)) {
+      return Promise.reject(
+        new ApiError("Referral program is currently unavailable (Coming Soon).", 503)
+      );
+    }
+
     const token = useAuthStore.getState().accessToken;
 
     if (token) {

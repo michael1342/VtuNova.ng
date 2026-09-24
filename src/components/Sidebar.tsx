@@ -109,12 +109,6 @@ const navItems: Record<string, NavItem[]> = {
       icon: <UserCircleIcon className="w-4 h-4" />,
       activeIcon: <UserCircleSolidIcon className="w-4 h-4" />
     },
-    {
-      label: 'Settings',
-      path: '/user/settings',
-      icon: <Cog6ToothIcon className="w-4 h-4" />,
-      activeIcon: <Cog6ToothSolidIcon className="w-4 h-4" />
-    },
   ],
 
   admin: [

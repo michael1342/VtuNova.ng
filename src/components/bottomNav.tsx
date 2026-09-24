@@ -41,12 +41,6 @@ const BottomNav = () => {
       path: role === 'admin' ? '/admin/users' : '/user/profile',
       icon: <UserCircleIcon className="w-6 h-6" />,
       activeIcon: <UserCircleSolidIcon className="w-6 h-6" />
-    },
-    {
-      label: 'Settings',
-      path: `/${role}/settings`,
-      icon: <Cog6ToothIcon className="w-6 h-6" />,
-      activeIcon: <Cog6ToothSolidIcon className="w-6 h-6" />
     }
   ];
 

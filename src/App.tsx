@@ -16,10 +16,10 @@ import Transactions from './pages/user/transactions'
 import Referrals from './pages/user/referral'
 import Notifications from './pages/user/notifications'
 import Profile from './pages/user/profile'
-import Settings from './pages/user/settings'
 import Login from './pages/login'
 import VerifyOtp from './pages/verifyOtp'
 import Unauthorized from './pages/unauthorized'
+import NotFound from './pages/NotFound'
 import AdminDashboard from './pages/Admin/dashboard'
 import AdminUserManagement from './pages/Admin/user'
 import AdminTransactions from './pages/Admin/transactions'
@@ -109,9 +109,6 @@ function App() {
                   <Route path="/user/profile" element={<ProtectedRoute allowedRoles={['user']}>
                     <Profile />
                   </ProtectedRoute>} />
-                  <Route path="/user/settings" element={<ProtectedRoute allowedRoles={['user']}>
-                    <Settings />
-                  </ProtectedRoute>} />
                   <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}>
                     <AdminDashboard />
                   </ProtectedRoute>} />
@@ -135,6 +132,7 @@ function App() {
                 <Route path="/verify-otp" element={<VerifyOtp />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </Router>
           

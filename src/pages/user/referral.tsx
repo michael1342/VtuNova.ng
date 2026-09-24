@@ -28,6 +28,10 @@ import {
   CheckIcon,
 } from '@heroicons/react/24/outline';
 import type { ReferralActivityEvent, ReferralUser } from '../../interface/user-page.interface';
+import { REFERRALS_ENABLED } from '../../config/features';
+
+export { REFERRALS_ENABLED };
+
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── MOCK DATA ───────────────────────────────────────────────────────────────
@@ -59,6 +63,148 @@ const MOCK_GROWTH_DATA = [
   { month: 'May', referrals: 64, earnings: 45000 },
   { month: 'Jun', referrals: 84, earnings: 85000 },
 ];
+
+// ─── DECORATIVE ANIMATED CLOCK COMPONENT ────────────────────────────────────
+function DecorativeClock() {
+  const hourTicks = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
+
+  return (
+    <div className="relative flex items-center justify-center my-2">
+      {/* Ambient background glow */}
+      <div
+        className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-600/25 via-blue-500/10 to-indigo-600/25 blur-xl motion-reduce:hidden"
+        aria-hidden="true"
+      />
+
+      {/* Scoped CSS animation for precision mechanical tick & accessibility */}
+      <style>{`
+        @keyframes vtunovaClockSecond {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes vtunovaClockMinute {
+          0% { transform: rotate(60deg); }
+          100% { transform: rotate(420deg); }
+        }
+        .vtunova-second-hand {
+          transform-origin: 50px 50px;
+          animation: vtunovaClockSecond 60s steps(60, end) infinite;
+        }
+        .vtunova-minute-hand {
+          transform-origin: 50px 50px;
+          animation: vtunovaClockMinute 3600s linear infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .vtunova-second-hand,
+          .vtunova-minute-hand {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
+      {/* Polished SVG Analog Dial */}
+      <svg
+        className="w-24 h-24 sm:w-28 sm:h-28 drop-shadow-xl"
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <defs>
+          <radialGradient id="vtunovaDialGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#1e1b4b" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#0a0914" stopOpacity="0.98" />
+          </radialGradient>
+          <linearGradient id="vtunovaRingGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#60a5fa" />
+            <stop offset="50%" stopColor="#818cf8" />
+            <stop offset="100%" stopColor="#3b82f6" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer Accent Glow Ring */}
+        <circle cx="50" cy="50" r="47" stroke="url(#vtunovaRingGrad)" strokeWidth="1.5" strokeOpacity="0.3" />
+
+        {/* Bezel Ring */}
+        <circle cx="50" cy="50" r="44" stroke="url(#vtunovaRingGrad)" strokeWidth="2.5" />
+
+        {/* Inner Dial Face */}
+        <circle cx="50" cy="50" r="42.5" fill="url(#vtunovaDialGrad)" />
+
+        {/* Hour Markers */}
+        {hourTicks.map((deg) => {
+          const isQuarter = deg % 90 === 0;
+          return (
+            <line
+              key={deg}
+              x1="50"
+              y1={isQuarter ? '11' : '12'}
+              x2="50"
+              y2={isQuarter ? '17' : '15'}
+              stroke={isQuarter ? '#60a5fa' : '#64748b'}
+              strokeWidth={isQuarter ? '2.2' : '1.2'}
+              strokeLinecap="round"
+              transform={`rotate(${deg} 50 50)`}
+            />
+          );
+        })}
+
+        {/* Hour Hand (Set to ~10 o'clock) */}
+        <line
+          x1="50"
+          y1="50"
+          x2="50"
+          y2="28"
+          stroke="#f8fafc"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          transform="rotate(300 50 50)"
+        />
+
+        {/* Minute Hand (Smooth movement) */}
+        <g className="vtunova-minute-hand">
+          <line
+            x1="50"
+            y1="50"
+            x2="50"
+            y2="19"
+            stroke="#93c5fd"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </g>
+
+        {/* Second Hand (Ticking mechanical movement) */}
+        <g className="vtunova-second-hand">
+          <line
+            x1="50"
+            y1="50"
+            x2="50"
+            y2="14"
+            stroke="#3b82f6"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+          <line
+            x1="50"
+            y1="50"
+            x2="50"
+            y2="59"
+            stroke="#3b82f6"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+          <circle cx="50" cy="59" r="2.2" fill="#3b82f6" />
+        </g>
+
+        {/* Center Pivot Hub */}
+        <circle cx="50" cy="50" r="3.5" fill="#3b82f6" />
+        <circle cx="50" cy="50" r="1.5" fill="#ffffff" />
+      </svg>
+    </div>
+  );
+}
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function Referrals() {
@@ -106,6 +252,7 @@ export default function Referrals() {
 
   // --- Helpers ---
   const handleCopy = (text: string, type: 'code' | 'link' | 'modalLink') => {
+    if (!REFERRALS_ENABLED) return;
     navigator.clipboard.writeText(text);
     if (type === 'code') {
       setCopiedCode(true);
@@ -121,6 +268,7 @@ export default function Referrals() {
 
   const handleTransferSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!REFERRALS_ENABLED) return;
     const amt = parseFloat(transferAmount);
     if (isNaN(amt) || amt <= 0 || amt > availableEarnings) {
       alert('Invalid amount selected.');
@@ -144,6 +292,7 @@ export default function Referrals() {
 
   const handleWithdrawSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!REFERRALS_ENABLED) return;
     const amt = parseFloat(withdrawAmount);
     if (isNaN(amt) || amt <= 0 || amt > availableEarnings) {
       alert('Invalid amount selected.');
@@ -170,6 +319,7 @@ export default function Referrals() {
   };
 
   const handleShare = (platform: string) => {
+    if (!REFERRALS_ENABLED) return;
     let url = '';
     const shareText = `Hey! Sign up on VtuNova using my referral link to get airtime, data and electricity bills discount instantly: ${referralLink}`;
     
@@ -213,7 +363,18 @@ export default function Referrals() {
   const currentPlatinumMilestone = isEmptyState ? 0 : 64;
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray font-sans transition-colors duration-200">
+    <div className="relative flex-1 flex flex-col min-h-screen bg-bg-dark-secondary text-text-gray font-sans transition-colors duration-200">
+      
+      {/* ── Background Content (Layout & content preserved, gently blurred & dimmed when disabled) ── */}
+      <div
+        inert={!REFERRALS_ENABLED ? true : undefined}
+        aria-hidden={!REFERRALS_ENABLED}
+        className={`w-full transition-all duration-300 ${
+          !REFERRALS_ENABLED
+            ? 'filter blur-[2px] md:blur-[2.5px] opacity-65 dark:opacity-45 select-none pointer-events-none'
+            : ''
+        }`}
+      >
       
       {/* ── Demo Switcher Banner (Subtle & Premium Developer Tools) ── */}
       {/* <div className="bg-blue-600/10 border-b border-blue-500/20 py-2 px-6 flex items-center justify-between text-xs text-blue-500">
@@ -1065,7 +1226,53 @@ export default function Referrals() {
         </div>
 
       </div>
+      </div>
 
+      {/* ── Full-Page Responsive Coming Soon Overlay (Positioned at Top) ── */}
+      {!REFERRALS_ENABLED && (
+        <div
+          role="region"
+          aria-label="Referrals Coming Soon Notice"
+          className="absolute inset-0 z-30 flex items-start justify-center p-4 sm:p-6 md:p-8 pt-6 sm:pt-8 md:pt-10 bg-slate-950/20 dark:bg-black/35 backdrop-blur-[1px] overflow-y-auto"
+        >
+          <div className="relative w-full max-w-xl mx-auto flex flex-col items-center text-center p-5 sm:p-8 rounded-2xl bg-bg-card/95 dark:bg-[#100f1c]/95 border border-border shadow-2xl backdrop-blur-xl animate-fade-in">
+            {/* Status Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 dark:text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75 motion-reduce:hidden" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+              </span>
+              <span>Feature In Development</span>
+            </div>
+
+            {/* Bold Coming Soon Heading */}
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black font-['Space_Grotesk'] tracking-wider text-text-white uppercase drop-shadow-sm mb-2">
+              COMING SOON
+            </h1>
+
+            {/* Polished Animated Decorative Clock */}
+            <div className="my-3 flex flex-col items-center">
+              <DecorativeClock />
+              <span className="sr-only">Decorative ticking clock indicating feature in development</span>
+            </div>
+
+            {/* Description Copy */}
+            <p className="text-xs sm:text-sm text-text-muted max-w-md leading-relaxed mb-5">
+              Our referral program is currently undergoing scheduled enhancements to introduce higher bonus tiers, instant automated payouts, and real-time commission tracking.
+            </p>
+
+            {/* Reassurance Info Badge */}
+            <div className="flex items-center gap-2.5 text-xs text-text-muted bg-bg-dark-secondary border border-border px-4 py-2.5 rounded-xl max-w-sm text-left">
+              <InformationCircleIcon className="w-5 h-5 text-primary shrink-0" />
+              <span>All existing referral links, codes, and wallet balances remain safe and will reactivate once live.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modals (only active when referrals feature is enabled) ── */}
+      {REFERRALS_ENABLED && (
+        <>
       {/* ── QR CODE MODAL ── */}
       {showQrModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
@@ -1412,6 +1619,8 @@ export default function Referrals() {
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
 
     </div>

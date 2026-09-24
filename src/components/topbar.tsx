@@ -86,8 +86,6 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
       return { title: 'Notifications', desc: 'Stay updated with transactions, wallet activity, account alerts, and important updates' };
     } else if (path.includes('/profile')) {
       return { title: 'My Profile', desc: 'Manage your personal information, account details, security settings, and preferences' };
-    } else if (path.includes('/settings')) {
-      return { title: 'Settings', desc: 'Customize your VtuNova account experience, security, notifications, and preferences' };
     }
     return { title: 'VtuNova', desc: 'VTU & Financial Services' };
   };
