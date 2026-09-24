@@ -20,9 +20,8 @@ import {
   QuestionMarkCircleIcon,
   ArrowRightOnRectangleIcon,
   ChartBarIcon,
-  ShieldCheckIcon
-  // ChevronRightIcon,
-  // ChevronLeftIcon,
+  ShieldCheckIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 // solid icons
@@ -213,29 +212,19 @@ const navItems: Record<string, NavItem[]> = {
   ]
 };
 
-const Sidebar = () => {
-  const [_, setMobileMenuOpen] = useState(false);
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+const Sidebar = ({ onClose }: SidebarProps) => {
   const location = useLocation();
   const [collapsed,] = useState(false);
-
-  // type roleProp = {
-  //   role: string;
-  // }
-
-  // const formatRole = ({role}: roleProp) =>
-  // role
-  //   .replace(/([a-z])([A-Z])/g, '$1 $2')
-  //   .replace(/[-_]/g, ' ')
-  //   .replace(/\s+/g, ' ')
-  //   .trim()
-  //   .toUpperCase();
 
   const { currentUser, logout } = useAuth() as {
     currentUser: { role?: string } | null;
     logout: (() => void) | null;
   };
-  // const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const { unreadCount } = useNotifications();
 
@@ -244,25 +233,30 @@ const Sidebar = () => {
   }
 
   const newRole = currentUser.role?.toLowerCase().trim() || 'user';
-  // const normalizedRole = newRole.replace(/[\s_-]/g, '');
-  // const displayRole = formatRole(newRole);
 
   const handleLogout = () => {
-    logout?.()
-    setMobileMenuOpen?.(false);
-    return navigate('/login')
-  }
-
-  // const role = 'user'; // hardcoded for now, replace with dynamic role from auth context
-
+    logout?.();
+    onClose?.();
+    return navigate('/login');
+  };
 
   return (
     <div
       className={`flex flex-col h-full bg-bg-dark-secondary border-r border-border transition-all duration-300 ${collapsed ? ' w-1  md:w-56 ' : 'w-56 '} shrink-0`}
     >
       {/* Logo */}
-      <div className="flex items-center py-2 px-3 border-b border-border h-[72px] overflow-hidden">
+      <div className="flex items-center justify-between py-2 px-3 border-b border-border h-[72px] overflow-hidden">
         <Logo collapsed={collapsed} />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="lg:hidden p-1.5 rounded-lg text-text-gray hover:text-text-white hover:bg-bg-card-hover transition-colors"
+            aria-label="Close sidebar"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
@@ -284,7 +278,7 @@ const Sidebar = () => {
                 )}
                 <Link
                   to={item.path}
-                  onClick={() => setMobileMenuOpen?.(false)}
+                  onClick={() => onClose?.()}
                   title={collapsed ? item.label : undefined}
                   className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-all duration-200 group relative
                     ${isActive
@@ -318,7 +312,7 @@ const Sidebar = () => {
       <div className="border-t border-border py-3 px-2 space-y-1">
         <Link
           to="/main/help"
-          onClick={() => setMobileMenuOpen?.(false)}
+          onClick={() => onClose?.()}
           className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-text-gray hover:text-text-white hover:bg-bg-card-hover transition-all duration-200"
         >
           <QuestionMarkCircleIcon className="w-4 h-4 shrink-0" />

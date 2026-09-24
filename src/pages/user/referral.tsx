@@ -1233,7 +1233,7 @@ export default function Referrals() {
         <div
           role="region"
           aria-label="Referrals Coming Soon Notice"
-          className="absolute inset-0 z-30 flex items-start justify-center p-4 sm:p-6 md:p-8 pt-6 sm:pt-8 md:pt-10 bg-slate-950/20 dark:bg-black/35 backdrop-blur-[1px] overflow-y-auto"
+          className="absolute inset-0 z-20 flex items-start justify-center p-4 sm:p-6 md:p-8 pt-6 sm:pt-8 md:pt-10 bg-slate-950/20 dark:bg-black/35 backdrop-blur-[1px] overflow-y-auto"
         >
           <div className="relative w-full max-w-xl mx-auto flex flex-col items-center text-center p-5 sm:p-8 rounded-2xl bg-bg-card/95 dark:bg-[#100f1c]/95 border border-border shadow-2xl backdrop-blur-xl animate-fade-in">
             {/* Status Pill Badge */}

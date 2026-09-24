@@ -45,7 +45,7 @@ const BottomNav = () => {
   ];
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-bg-dark-secondary border-t border-border px-6 py-2 flex justify-between items-center pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-bg-dark-secondary border-t border-border px-6 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] flex justify-between items-center h-[calc(4rem+env(safe-area-inset-bottom,0px))] box-border">
       {navItems.map((item) => {
         const isActive = location.pathname.startsWith(item.path);
         return (
