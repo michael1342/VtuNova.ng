@@ -19,7 +19,7 @@ http.interceptors.request.use(
     // Guard against referral API requests while referral feature is coming soon
     if (!REFERRALS_ENABLED && config.url && /referral/i.test(config.url)) {
       return Promise.reject(
-        new ApiError("Referral program is currently unavailable (Coming Soon).", 503)
+        new Error("Referral program is currently unavailable (Coming Soon).")
       );
     }
 
