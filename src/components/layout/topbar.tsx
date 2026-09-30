@@ -1,8 +1,8 @@
-import { useTheme } from '../context/themeContext';
+import { useTheme } from '../../context/themeContext';
 import { useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNotifications } from '../context/NotificationContext';
-import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import {
   BellIcon,
   PhoneIcon,
@@ -11,9 +11,10 @@ import {
   Cog6ToothIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
-import { formatAmount } from '../utils/formatter.ts';
-import Badge from './ui/Badge';
-import type { TopbarProps } from '../interface/components.interface';
+import { formatAmount } from '../../utils/formatter';
+import Badge from '../ui/Badge';
+import type { TopbarProps } from '../../interface/components.interface';
+import type { BackendNotification } from '../../interface/notification.interface';
 
 // Derive notification category
 // Format relative or compact timestamp for topbar preview
@@ -110,7 +111,7 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
   };
 
   // Get top 5 recent notifications
-  const recentNotifications = useMemo(() => {
+  const recentNotifications = useMemo<BackendNotification[]>(() => {
     return (notifications || []).slice(0, 5);
   }, [notifications]);
 

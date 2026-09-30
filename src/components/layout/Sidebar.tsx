@@ -1,8 +1,8 @@
 import { useState, Fragment } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import Logo from './Logo';
+import Logo from '../Logo';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/themeContext';
+import { useTheme } from '../../context/themeContext';
 
 
 import {
@@ -40,11 +40,11 @@ import {
   ChartBarIcon as ChartBarSolidIcon,
   ShieldCheckIcon as ShieldCheckSolidIcon
 } from '@heroicons/react/24/solid';
-import { useAuth } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
-import Badge from './ui/Badge';
+import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
+import Badge from '../ui/Badge';
 
-import type { NavItem } from '../interface/components.interface';
+import type { NavItem } from '../../interface/components.interface';
 
 const navItems: Record<string, NavItem[]> = {
   user: [

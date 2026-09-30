@@ -79,6 +79,7 @@ export const deleteBeneficiary = async (id: string): Promise<any> => {
 export const uploadProfilePic = async (formData: any) => {
     try {
         const response = await http.patch("/users/upload-profile-pic", formData, { headers: { "Content-Type": "multipart/form-data" } });
+        console.log(response)
         return response;
     } catch (err) {
         if (err instanceof ApiError) {

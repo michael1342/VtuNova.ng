@@ -4,6 +4,7 @@ import { useTheme } from '../../context/themeContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatAmount } from '../../utils/formatter';
 import { editProfile, getTransactions, uploadProfilePic, changePassword } from '../../api/user';
+import BASE_URL from '../../api/http';
 import {
   UserIcon,
   EnvelopeIcon,
@@ -269,7 +270,7 @@ export default function Profile() {
           const profilePath = typeof currentUser?.profilePic === 'object'
             ? currentUser.profilePic?.url
             : currentUser?.profilePic;
-          setProfilePhoto(profilePath ? `http://localhost:3000/${profilePath}` : event.target.result.toString());
+          setProfilePhoto(profilePath ? `https://vtunova-ng-backend-v1.onrender.com/${profilePath}` : event.target.result.toString());
           triggerToast('Profile photo updated successfully!', 'success');
         }
       };
@@ -367,8 +368,8 @@ export default function Profile() {
                     )} */}
                       <img
                         src={typeof currentUser?.profilePic === 'object'
-                          ? (currentUser.profilePic?.url ? `http://localhost:3000/${currentUser.profilePic.url}` : '')
-                          : (currentUser?.profilePic ? `http://localhost:3000/${currentUser.profilePic}` : '')}
+                          ? (currentUser.profilePic?.url ? `https://vtunova-ng-backend-v1.onrender.com/${currentUser.profilePic.url}` : '')
+                          : (currentUser?.profilePic ? `https://vtunova-ng-backend-v1.onrender.com/${currentUser.profilePic}` : '')}
                         alt="Avatar"
                         className="w-full h-full object-cover"
                       />

@@ -42,6 +42,7 @@ export const readNotification = async (): Promise<any | undefined> => {
 export const readOneNotification = async (id: string): Promise<any | undefined> => {
     try {
         const response = await http.patch(`/notifications/read-one-notification/${id}`)
+        console.log('read', response)
         if (!response) return null
         return { data: response, success: true}
     } catch (err) {

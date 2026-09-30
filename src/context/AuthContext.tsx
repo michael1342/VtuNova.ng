@@ -18,11 +18,12 @@ const AuthContext =
 export function AuthProvider({ children }: ProviderProps) {
   const [isAuthenticated,  setIsAuthenticated]  = useState(false);
   // const currentUser = useAuthStore((state) => state.currentUser);
-  const [currentUser, setCurrentUser] = useState<any | null>(current?.user)
+  const [currentUser, setCurrentUser] = useState<any | null>(current?.user || '')
   // const [accountBalance, setAccountBalance] = useState<number | null>(
   //    currentUser?.wallet?.balance ?? 0
   // );
-  const accountBalance = currentUser?.wallet?.balance ?? 0
+  const calculated = currentUser?.wallet?.balance - currentUser?.wallet?.reserved
+  const accountBalance = calculated
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
   const setOtpId = useAuthStore((state) => state.setOtpId);

@@ -20,6 +20,7 @@ const normalizeNotification = (raw: RawNotification): BackendNotification => {
     category: notification.category ?? 'system',
     title: notification.title ?? 'Account Notification',
     message: notification.message ?? 'You have a new account notification.',
+    date: notification.date ?? 'no date'
   };
 
   return {
@@ -59,6 +60,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             ? data.flatMap((item: any) => item.notifications ?? item)
             : (data as any).notifications ?? [data];
           setNotifications(records.map((item: RawNotification) => normalizeNotification(item)));
+       
         }
       } catch (err) {
         console.error('Failed to fetch notifications', err);
