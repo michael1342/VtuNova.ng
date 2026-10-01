@@ -121,7 +121,7 @@ export default function Profile() {
 
   // Live referral values from API
   const referralCode = currentUser?.referralCode ?? '—';
-  const referralLink = referralCode !== '—' ? `https://vtunova.com/ref/${referralCode}` : '';
+  const referralLink = referralCode !== '—' ? `https://vtunova.cv/ref/${referralCode}` : '';
   
   const [activities, setActivities] = useState<ProfileActivityEvent[]>([
     { id: 'act-1', type: 'profile', description: 'Profile information updated successfully.', time: '10 mins ago' },
@@ -270,7 +270,7 @@ export default function Profile() {
           const profilePath = typeof currentUser?.profilePic === 'object'
             ? currentUser.profilePic?.url
             : currentUser?.profilePic;
-          setProfilePhoto(profilePath ? `https://vtunova-ng-backend-v1.onrender.com/${profilePath}` : event.target.result.toString());
+          setProfilePhoto(profilePath ? `https://api.vtunova.cv/${profilePath}` : event.target.result.toString());
           triggerToast('Profile photo updated successfully!', 'success');
         }
       };
@@ -368,8 +368,8 @@ export default function Profile() {
                     )} */}
                       <img
                         src={typeof currentUser?.profilePic === 'object'
-                          ? (currentUser.profilePic?.url ? `https://vtunova.cv/${currentUser.profilePic.url}` : '')
-                          : (currentUser?.profilePic ? `https://vtunova.cv/${currentUser.profilePic}` : '')}
+                          ? (currentUser.profilePic?.url ? `https://api.vtunova.cv/${currentUser.profilePic.url}` : '')
+                          : (currentUser?.profilePic ? `https://api.vtunova.cv/${currentUser.profilePic}` : '')}
                         alt="Avatar"
                         className="w-full h-full object-cover"
                       />
