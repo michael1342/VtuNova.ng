@@ -121,7 +121,7 @@ export default function Profile() {
 
   // Live referral values from API
   const referralCode = currentUser?.referralCode ?? '—';
-  const referralLink = referralCode !== '—' ? `https://vtunova.cv/ref/${referralCode}` : '';
+  const referralLink = referralCode !== '—' ? `https://api.vtunova.cv/ref/${referralCode}` : '';
   
   const [activities, setActivities] = useState<ProfileActivityEvent[]>([
     { id: 'act-1', type: 'profile', description: 'Profile information updated successfully.', time: '10 mins ago' },

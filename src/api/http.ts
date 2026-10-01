@@ -3,7 +3,7 @@ import useAuthStore from "./store";
 import ApiError from "./ApiError";
 import { REFERRALS_ENABLED } from "../config/features";
 
-export const BASE_URL ='https://api.vtunova.cv' /* 'http://localhost:3000/api' */;
+export const BASE_URL = "https://api.vtunova.cv/api" /* 'http://localhost:3000/api' */;
 
 const http = axios.create({
   baseURL: BASE_URL,
