@@ -340,7 +340,7 @@ const Topbar = ({ mobileMenuOpen, setMobileMenuOpen }: TopbarProps) => {
         >
           {(currentUser as any)?.profilePic?.url ? (
             <img
-              src={`https://vtunova-ng-backend-v1.onrender.com/${(currentUser as any).profilePic.url}`}
+              src={`https://vtunova.cv/${(currentUser as any).profilePic.url}`}
               alt={currentUser?.firstName?.[0] ?? 'U'}
               className="w-full h-full object-cover"
               onError={(e) => {

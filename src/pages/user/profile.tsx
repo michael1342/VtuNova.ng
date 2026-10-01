@@ -368,8 +368,8 @@ export default function Profile() {
                     )} */}
                       <img
                         src={typeof currentUser?.profilePic === 'object'
-                          ? (currentUser.profilePic?.url ? `https://vtunova-ng-backend-v1.onrender.com/${currentUser.profilePic.url}` : '')
-                          : (currentUser?.profilePic ? `https://vtunova-ng-backend-v1.onrender.com/${currentUser.profilePic}` : '')}
+                          ? (currentUser.profilePic?.url ? `https://vtunova.cv/${currentUser.profilePic.url}` : '')
+                          : (currentUser?.profilePic ? `https://vtunova.cv/${currentUser.profilePic}` : '')}
                         alt="Avatar"
                         className="w-full h-full object-cover"
                       />
