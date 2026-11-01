@@ -1,3 +1,4 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AreaChart,
@@ -27,6 +28,7 @@ import {
   SignalIcon
 } from '@heroicons/react/24/outline';
 import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, DataNetworkStats as NetworkStats, DataOrder, PopularPlan } from '../../interface/admin-orders.interface';
+import { getAdminDataOrders, retryAdminOrder, updateAdminOrderStatus } from '../../api/adminOrders';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -280,7 +282,7 @@ const NETWORK_DISTRIBUTION_PIE = [
 export default function AdminDataOrders() {
   
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [orders, setOrders] = useState<DataOrder[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<DataOrder[]>([]);
   const [networkStats] = useState<NetworkStats[]>(INITIAL_NETWORK_STATS);
   const [popularPlans] = useState<PopularPlan[]>(POPULAR_PLANS);
   const [alerts, setAlerts] = useState<AlertLog[]>(INITIAL_ALERTS);
@@ -311,6 +313,18 @@ export default function AdminDataOrders() {
   // Export options modal
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
+
+  useEffect(() => {
+    let active = true;
+    getAdminDataOrders()
+      .then((data) => {
+        if (active) setOrders(data);
+      })
+      .catch((error) => console.error('Failed to load data orders:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Live timeline simulated feed
   useEffect(() => {
@@ -402,13 +416,16 @@ export default function AdminDataOrders() {
     triggerToast('Filters reset successfully.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setOrders(INITIAL_ORDERS);
-      setLoading(false);
+    try {
+      setOrders(await getAdminDataOrders());
       triggerToast('Data orders log updated.');
-    }, 750);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh data orders.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Row selection handlers
@@ -432,31 +449,22 @@ export default function AdminDataOrders() {
   };
 
   // Failed queue interventions
-  const handleRetryOrder = (orderId: string) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        return { 
-          ...o, 
-          status: 'Success', 
-          assignedAdmin: undefined,
-          timeline: { ...o.timeline, completed: 'Just now', delivered: 'Just now', processing: 'Just now' }
-        };
-      }
-      return o;
-    }));
-    triggerToast(`Retried data order ${orderId} successfully. Delivery receipt dispatched.`);
-    setIsDrawerOpen(false);
+  const handleRetryOrder = async (orderId: string) => {
+    try {
+      await retryAdminOrder(orderId);
+      setOrders(await getAdminDataOrders());
+      triggerToast('Status check queued. Refresh to see the provider result.');
+      setIsDrawerOpen(false);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to queue a status check.'); }
   };
 
-  const handleRefundOrder = (orderId: string) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        return { ...o, status: 'Reversed', assignedAdmin: 'System Refund' };
-      }
-      return o;
-    }));
-    triggerToast(`Data order ${orderId} reversed. Recredit amount of ₦${orders.find(o => o.id === orderId)?.amount} logged.`);
-    setIsDrawerOpen(false);
+  const handleRefundOrder = async (orderId: string) => {
+    try {
+      const result = await updateAdminOrderStatus(orderId, 'Reversed') as { status?: string };
+      setOrders(await getAdminDataOrders());
+      triggerToast(result.status === 'pending_review' ? 'Wallet refund requested. Review it in Wallet Adjustments.' : 'Order status refreshed.');
+      setIsDrawerOpen(false);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to request a refund.'); }
   };
 
   const failedOrdersQueue = useMemo(() => {
@@ -465,6 +473,8 @@ export default function AdminDataOrders() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">
+      <AdminLoadMore items={orders} load={getAdminDataOrders} onLoaded={setOrders} />
+
       
       {/* Toast Alert Banner */}
       {toastMessage && (
@@ -899,7 +909,7 @@ export default function AdminDataOrders() {
                           <td className="px-4 py-4 font-mono text-text-gray">{order.recipient}</td>
                           <td className="px-4 py-4 text-text-white">{order.bundleName}</td>
                           <td className="px-4 py-4 font-bold text-text-white">₦{order.amount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-text-muted">₦{order.profit}</td>
+                          <td className="px-4 py-4 text-text-muted">₦{order.profit ?? '—'}</td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                               order.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
@@ -1444,7 +1454,7 @@ export default function AdminDataOrders() {
                 <div className="grid grid-cols-3 gap-4 text-xs">
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Cost Price</span>
-                    <span className="text-text-white">₦{selectedOrder.costPrice}</span>
+                    <span className="text-text-white">₦{selectedOrder.costPrice ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Selling Price</span>
@@ -1452,15 +1462,15 @@ export default function AdminDataOrders() {
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Profit Share</span>
-                    <span className="text-emerald-400 font-bold">₦{selectedOrder.profit}</span>
+                    <span className="text-emerald-400 font-bold">₦{selectedOrder.profit ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">User Bal Before</span>
-                    <span className="text-text-muted">₦{selectedOrder.walletBefore.toLocaleString()}</span>
+                    <span className="text-text-muted">₦{selectedOrder.walletBefore?.toLocaleString() ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">User Bal After</span>
-                    <span className="text-text-white font-bold">₦{selectedOrder.walletAfter.toLocaleString()}</span>
+                    <span className="text-text-white font-bold">₦{selectedOrder.walletAfter?.toLocaleString() ?? '—'}</span>
                   </div>
                 </div>
               </div>

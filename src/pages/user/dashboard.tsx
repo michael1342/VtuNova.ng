@@ -169,11 +169,7 @@ const Dashboard = () => {
   const [chartMetric, setChartMetric] = useState<'transactions' | 'amount'>('transactions');
   const [serviceMetric, setServiceMetric] = useState<'amount' | 'count'>('count');
 
-  const { notifications, unreadCount, isLoading: isLoadingNotifications, markAsRead, refetch } = useNotifications();
-
-   useEffect(() => {
-    refetch()
-  },[])
+  const { notifications, unreadCount, isLoading: isLoadingNotifications, markAsRead } = useNotifications();
 
   const txMap = useMemo(() => {
     const map = new Map<string, Transaction>();
@@ -373,7 +369,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Wallet Balance"
-            value={formatAmount(accountBalance || 0, true) ?? ''}
+            value={formatAmount(accountBalance || 0, true)}
             change="+12.4%"
             positive={true}
             iconBg="bg-blue-500/15"
@@ -409,7 +405,7 @@ const Dashboard = () => {
           />
           <StatCard
             label="Referral Earnings"
-            value={formatAmount(typeof currentUser?.wallet === 'object' ? currentUser.wallet.referralEarnings || 0 : 0, true) ?? ''}
+            value={formatAmount(typeof currentUser?.wallet === 'object' ? currentUser.wallet.referralEarnings || 0 : 0, true)}
             change="-8.6%"
             positive={false}
             iconBg="bg-pink-500/15"

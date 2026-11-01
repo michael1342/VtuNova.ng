@@ -1,3 +1,4 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AreaChart,
@@ -28,6 +29,7 @@ import {
   DocumentDuplicateIcon
 } from '@heroicons/react/24/outline';
 import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, ElectricityPayment, ElectricityCustomer as Customer, ProviderStats, TokenRecord } from '../../interface/admin-orders.interface';
+import { getAdminElectricityPayments, retryAdminOrder, updateAdminOrderStatus } from '../../api/adminOrders';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -282,9 +284,9 @@ const PROVIDER_DISTRIBUTION_PIE = [
 ];
 
 export default function AdminElectricityPayments() {
-  
+
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [payments, setPayments] = useState<ElectricityPayment[]>(INITIAL_PAYMENTS);
+  const [payments, setPayments] = useState<ElectricityPayment[]>([]);
   const [providers] = useState<ProviderStats[]>(INITIAL_PROVIDERS);
   const [tokens, setTokens] = useState<TokenRecord[]>(INITIAL_TOKENS);
   const [alerts, setAlerts] = useState<AlertLog[]>(INITIAL_ALERTS);
@@ -316,6 +318,18 @@ export default function AdminElectricityPayments() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
 
+  useEffect(() => {
+    let active = true;
+    getAdminElectricityPayments()
+      .then((data) => {
+        if (active) setPayments(data);
+      })
+      .catch((error) => console.error('Failed to load electricity payments:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Live timeline events update simulator
   useEffect(() => {
     const interval = setInterval(() => {
@@ -346,7 +360,7 @@ export default function AdminElectricityPayments() {
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
       // Global Search
-      const searchMatch = searchQuery === '' || 
+      const searchMatch = searchQuery === '' ||
         p.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -404,18 +418,21 @@ export default function AdminElectricityPayments() {
     triggerToast('Filters reset successfully.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setPayments(INITIAL_PAYMENTS);
-      setLoading(false);
+    try {
+      setPayments(await getAdminElectricityPayments());
       triggerToast('Payments ledger updated.');
-    }, 750);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh electricity payments.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Row selections
   const handleSelectRow = (id: string) => {
-    setSelectedPaymentIds(prev => 
+    setSelectedPaymentIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -434,48 +451,22 @@ export default function AdminElectricityPayments() {
   };
 
   // Manual Retry / Refund overrides
-  const handleRetryPayment = (payId: string) => {
-    const generatedTokenVal = `${Math.floor(Math.random() * 9000) + 1000} ${Math.floor(Math.random() * 9000) + 1000} ${Math.floor(Math.random() * 9000) + 1000} ${Math.floor(Math.random() * 9000) + 1000}`;
-    
-    setPayments(prev => prev.map(p => {
-      if (p.id === payId) {
-        return { 
-          ...p, 
-          status: 'Success',
-          token: generatedTokenVal,
-          tokenDeliveryStatus: 'Delivered',
-          unitsPurchased: Math.round(p.amount / 110.5),
-          assignedAdmin: undefined,
-          timeline: { ...p.timeline, tokenGenerated: 'Just now', completed: 'Just now' }
-        };
-      }
-      return p;
-    }));
-
-    // Add generated token to tokens queue list
-    const meterNum = payments.find(p => p.id === payId)?.meterNumber || '12345678901';
-    const newRecord: TokenRecord = {
-      token: generatedTokenVal,
-      meter: meterNum,
-      units: Math.round((payments.find(p => p.id === payId)?.amount || 5000) / 110.5),
-      date: '2026-06-20',
-      status: 'Active'
-    };
-    setTokens(prev => [newRecord, ...prev]);
-
-    triggerToast(`Token generated for payment ${payId}: ${generatedTokenVal}`);
-    setIsDrawerOpen(false);
+  const handleRetryPayment = async (payId: string) => {
+    try {
+      await retryAdminOrder(payId);
+      setPayments(await getAdminElectricityPayments());
+      triggerToast('Status check queued. Refresh to see the provider result.');
+      setIsDrawerOpen(false);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to queue a status check.'); }
   };
 
-  const handleRefundPayment = (payId: string) => {
-    setPayments(prev => prev.map(p => {
-      if (p.id === payId) {
-        return { ...p, status: 'Reversed', tokenDeliveryStatus: 'Failed', assignedAdmin: 'System Refund' };
-      }
-      return p;
-    }));
-    triggerToast(`Reconciliation complete. Refund issued for Payment ${payId}.`);
-    setIsDrawerOpen(false);
+  const handleRefundPayment = async (payId: string) => {
+    try {
+      const result = await updateAdminOrderStatus(payId, 'Reversed') as { status?: string };
+      setPayments(await getAdminElectricityPayments());
+      triggerToast(result.status === 'pending_review' ? 'Wallet refund requested. Review it in Wallet Adjustments.' : 'Order status refreshed.');
+      setIsDrawerOpen(false);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to request a refund.'); }
   };
 
   const failedPaymentsQueue = useMemo(() => {
@@ -490,7 +481,9 @@ export default function AdminElectricityPayments() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">
-      
+      <AdminLoadMore items={payments} load={getAdminElectricityPayments} onLoaded={setPayments} />
+
+
       {/* Toast popup */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-blue-600 border border-blue-400 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
@@ -539,7 +532,7 @@ export default function AdminElectricityPayments() {
 
         {/* ─── KPI OVERVIEW CARDS ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          
+
           {/* Card 1: Total Payments */}
           <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between hover:scale-102 hover:shadow-lg transition-all duration-200 group">
             <div className="flex items-center justify-between">
@@ -658,7 +651,7 @@ export default function AdminElectricityPayments() {
 
         {/* ─── PAYMENT CONTROLS TOOLBAR ──────────────────────────────────────── */}
         <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xs">
-          
+
           <div className="flex flex-col lg:flex-row items-center gap-3">
             {/* Global Search */}
             <div className="relative w-full lg:flex-1">
@@ -705,7 +698,7 @@ export default function AdminElectricityPayments() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              
+
               {/* Distribution Company */}
               <div>
                 <label className="block text-[10px] font-semibold text-text-muted uppercase mb-1">Distribution Company (DisCo)</label>
@@ -812,10 +805,10 @@ export default function AdminElectricityPayments() {
 
         {/* ─── PAYMENTS TABLE & DETAILS DRAWER ────────────────────────────────── */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-          
+
           {/* Table Container (2/3 width) */}
           <div className="xl:col-span-2 bg-bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
-            
+
             <div className="p-5 border-b border-border flex items-center justify-between">
               <span className="text-text-white font-heading font-extrabold text-sm">Audited DisCo Ledger</span>
               <span className="text-[10px] bg-blue-500/10 text-blue-500 px-2.5 py-1 rounded-full font-bold">
@@ -835,7 +828,7 @@ export default function AdminElectricityPayments() {
                         className="rounded border-border focus:ring-blue-500 text-blue-600"
                       />
                     </th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('id'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -845,7 +838,7 @@ export default function AdminElectricityPayments() {
                     <th className="px-4 py-4">Distribution Company (DisCo)</th>
                     <th className="px-4 py-4">Meter Number</th>
                     <th className="px-4 py-4">Meter Type</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('amount'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -853,7 +846,7 @@ export default function AdminElectricityPayments() {
                     </th>
                     <th className="px-4 py-4">Generated Token</th>
                     <th className="px-4 py-4">Status</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('date'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -906,8 +899,8 @@ export default function AdminElectricityPayments() {
                     paginatedPayments.map((pay) => {
                       const isSelected = selectedPaymentIds.includes(pay.id);
                       return (
-                        <tr 
-                          key={pay.id} 
+                        <tr
+                          key={pay.id}
                           className={`hover:bg-bg-dark-secondary/30 transition-colors cursor-pointer ${isSelected ? 'bg-blue-500/5' : ''}`}
                           onClick={() => { setSelectedPayment(pay); setIsDrawerOpen(true); }}
                         >
@@ -932,7 +925,7 @@ export default function AdminElectricityPayments() {
                             {pay.token !== '-' ? (
                               <div className="flex items-center gap-1">
                                 <span>{pay.token}</span>
-                                <button 
+                                <button
                                   onClick={() => handleCopyText(pay.token)}
                                   className="p-0.5 hover:bg-bg-dark-secondary rounded text-text-muted hover:text-text-white transition-colors"
                                   title="Copy Token"
@@ -943,12 +936,11 @@ export default function AdminElectricityPayments() {
                             ) : '-'}
                           </td>
                           <td className="px-4 py-4">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              pay.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
-                              pay.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                              pay.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
-                              'bg-slate-500/10 text-text-muted border border-border'
-                            }`}>
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${pay.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+                                pay.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
+                                  pay.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
+                                    'bg-slate-500/10 text-text-muted border border-border'
+                              }`}>
                               {pay.status}
                             </span>
                           </td>
@@ -1000,7 +992,7 @@ export default function AdminElectricityPayments() {
                   </span>{' '}
                   of <span className="text-text-white font-bold">{sortedPayments.length}</span> entries
                 </span>
-                
+
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1013,11 +1005,10 @@ export default function AdminElectricityPayments() {
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(idx + 1)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                        currentPage === idx + 1 
-                          ? 'bg-blue-600 text-white shadow-xs' 
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${currentPage === idx + 1
+                          ? 'bg-blue-600 text-white shadow-xs'
                           : 'border border-border text-text-muted hover:text-text-white hover:bg-bg-card-hover'
-                      }`}
+                        }`}
                     >
                       {idx + 1}
                     </button>
@@ -1037,7 +1028,7 @@ export default function AdminElectricityPayments() {
 
           {/* Right column monitoring timelines */}
           <div className="space-y-6">
-            
+
             {/* Live Token Monitor section */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
               <div className="border-b border-border pb-2 flex items-center justify-between">
@@ -1052,10 +1043,9 @@ export default function AdminElectricityPayments() {
                   <div key={idx} className="p-3 bg-bg-dark-secondary/35 border border-border/50 rounded-xl space-y-2 hover:border-border-hover transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="font-mono font-bold text-emerald-400 select-all">{t.token}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        t.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
-                        t.status === 'Used' ? 'bg-slate-500/10 text-text-muted' : 'bg-amber-500/10 text-amber-400'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${t.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
+                          t.status === 'Used' ? 'bg-slate-500/10 text-text-muted' : 'bg-amber-500/10 text-amber-400'
+                        }`}>
                         {t.status}
                       </span>
                     </div>
@@ -1117,7 +1107,7 @@ export default function AdminElectricityPayments() {
                 {selectedPaymentIds.length} payments selected
               </span>
             </div>
-            
+
             <div className="h-px w-full md:h-6 md:w-px bg-border/60" />
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1164,8 +1154,8 @@ export default function AdminElectricityPayments() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {providers.map((p, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className="bg-bg-dark-secondary/35 border border-border/50 rounded-xl p-4 flex items-center justify-between hover:border-border-hover transition-colors"
               >
                 <div className="space-y-1">
@@ -1173,7 +1163,7 @@ export default function AdminElectricityPayments() {
                     {p.name}
                   </span>
                   <p className="text-xs text-text-muted mt-1">Tx Count: <span className="text-text-white font-bold">{p.txCount.toLocaleString()}</span></p>
-                  <p className="text-xs text-text-muted">Rev: <span className="text-text-white font-bold">₦{(p.revenue/1000000).toFixed(1)}M</span></p>
+                  <p className="text-xs text-text-muted">Rev: <span className="text-text-white font-bold">₦{(p.revenue / 1000000).toFixed(1)}M</span></p>
                   <p className="text-[10px] text-text-muted">Avg Processing: <span className="text-text-white font-bold">{p.avgProcessingTime}</span></p>
                 </div>
                 <div className="text-right">
@@ -1253,7 +1243,7 @@ export default function AdminElectricityPayments() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            
+
             {/* Chart 1: Revenue Stack */}
             <div className="bg-bg-dark-secondary/30 border border-border/50 rounded-xl p-4 space-y-3">
               <span className="text-[11px] font-bold text-text-white uppercase font-heading tracking-wider">Weekly DisCo Revenue (₦)</span>
@@ -1262,13 +1252,13 @@ export default function AdminElectricityPayments() {
                   <AreaChart data={REVENUE_ANALYTICS_DATA}>
                     <defs>
                       <linearGradient id="elecGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" stroke="var(--bg-muted)" fontSize={10} />
-                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v/1000000}M`} />
+                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v / 1000000}M`} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }} />
                     <Area type="monotone" dataKey="Revenue" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#elecGrad)" />
                   </AreaChart>
@@ -1343,18 +1333,17 @@ export default function AdminElectricityPayments() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {alerts.map((alert) => (
-              <div 
-                key={alert.id} 
+              <div
+                key={alert.id}
                 className="bg-bg-dark-secondary/35 border border-border/50 rounded-xl p-4 flex flex-col justify-between hover:border-border-hover transition-colors"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-text-muted font-bold uppercase">{alert.id}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      alert.severity === 'Critical' ? 'bg-red-500/15 text-red-400 border border-red-500/25' :
-                      alert.severity === 'High' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25' :
-                      'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${alert.severity === 'Critical' ? 'bg-red-500/15 text-red-400 border border-red-500/25' :
+                        alert.severity === 'High' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/25' :
+                          'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                      }`}>
                       {alert.severity}
                     </span>
                   </div>
@@ -1376,9 +1365,9 @@ export default function AdminElectricityPayments() {
       {isDrawerOpen && selectedPayment && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
           <div onClick={() => setIsDrawerOpen(false)} className="flex-1" />
-          
+
           <div className="w-full max-w-lg bg-bg-card border-l border-border h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-            
+
             {/* Drawer Header */}
             <div className="p-6 border-b border-border flex items-center justify-between bg-bg-dark-secondary/40">
               <div className="flex items-center gap-3">
@@ -1400,19 +1389,18 @@ export default function AdminElectricityPayments() {
 
             {/* Scrollable contents */}
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              
+
               {/* Status block */}
               <div className="p-4 rounded-2xl bg-bg-dark-secondary/40 border border-border/80 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] uppercase font-bold text-text-muted tracking-wide">Status State</span>
                   <p className="text-text-white font-bold text-sm mt-0.5">{selectedPayment.status}</p>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                  selectedPayment.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                  selectedPayment.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                  selectedPayment.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                  'bg-slate-500/10 text-text-muted border border-border'
-                }`}>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${selectedPayment.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                    selectedPayment.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                      selectedPayment.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                        'bg-slate-500/10 text-text-muted border border-border'
+                  }`}>
                   {selectedPayment.status}
                 </span>
               </div>
@@ -1520,7 +1508,7 @@ export default function AdminElectricityPayments() {
                 <div className="grid grid-cols-3 gap-4 text-xs">
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Cost Price</span>
-                    <span className="text-text-white">₦{selectedPayment.costPrice}</span>
+                    <span className="text-text-white">₦{selectedPayment.costPrice ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Selling Price</span>
@@ -1528,15 +1516,15 @@ export default function AdminElectricityPayments() {
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Profit Share</span>
-                    <span className="text-emerald-400 font-bold">₦{selectedPayment.profit}</span>
+                    <span className="text-emerald-400 font-bold">₦{selectedPayment.profit ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">User Bal Before</span>
-                    <span className="text-text-muted">₦{selectedPayment.walletBefore.toLocaleString()}</span>
+                    <span className="text-text-muted">₦{selectedPayment.walletBefore?.toLocaleString() ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">User Bal After</span>
-                    <span className="text-text-white font-bold">₦{selectedPayment.walletAfter.toLocaleString()}</span>
+                    <span className="text-text-white font-bold">₦{selectedPayment.walletAfter?.toLocaleString() ?? '—'}</span>
                   </div>
                 </div>
               </div>
@@ -1552,10 +1540,10 @@ export default function AdminElectricityPayments() {
               {/* Stepper timeline */}
               <div className="space-y-4">
                 <h4 className="text-text-white font-heading font-bold text-xs uppercase tracking-wider border-b border-border/50 pb-1.5">Processing Timeline</h4>
-                
+
                 <div className="relative pl-6 space-y-4 text-xs">
                   <div className="absolute left-2.5 top-1.5 bottom-1.5 w-0.5 bg-border" />
-                  
+
                   <div className="relative flex gap-3">
                     <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-blue-500 border border-bg-card" />
                     <div>
@@ -1581,10 +1569,9 @@ export default function AdminElectricityPayments() {
                   </div>
 
                   <div className="relative flex gap-3">
-                    <div className={`absolute -left-[21px] w-2.5 h-2.5 rounded-full border border-bg-card ${
-                      selectedPayment.status === 'Success' ? 'bg-emerald-500' :
-                      selectedPayment.status === 'Pending' ? 'bg-amber-500' : 'bg-red-500'
-                    }`} />
+                    <div className={`absolute -left-[21px] w-2.5 h-2.5 rounded-full border border-bg-card ${selectedPayment.status === 'Success' ? 'bg-emerald-500' :
+                        selectedPayment.status === 'Pending' ? 'bg-amber-500' : 'bg-red-500'
+                      }`} />
                     <div>
                       <span className="font-semibold text-text-white block">Token Generation Complete</span>
                       <span className="text-[10px] text-text-muted">{selectedPayment.date} at {selectedPayment.timeline.completed}</span>
@@ -1657,7 +1644,7 @@ export default function AdminElectricityPayments() {
             >
               ✕
             </button>
-            
+
             <h3 className="text-text-white font-heading font-extrabold text-base mb-2">Export Electricity Payments</h3>
             <p className="text-text-gray text-xs mb-4">
               Select export parameter format and generate standard download reports.

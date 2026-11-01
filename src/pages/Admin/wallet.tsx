@@ -1,3 +1,4 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AreaChart,
@@ -30,6 +31,13 @@ import {
 } from '@heroicons/react/24/outline';
 import type { AdminActivityEvent as ActivityEvent } from '../../interface/admin-orders.interface';
 import type { PendingAdjustment, SecurityLog, WalletAccount } from '../../interface/admin.interface';
+import {
+  createAdminWalletAdjustment,
+  getAdminWalletAdjustments,
+  getAdminWallets,
+  reviewAdminWalletAdjustment,
+  updateAdminWalletStatus,
+} from '../../api/adminWallet';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -233,10 +241,10 @@ const FUNDING_METHOD_PIE = [
 ];
 
 export default function AdminWalletManagement() {
-  
+
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [wallets, setWallets] = useState<WalletAccount[]>(INITIAL_WALLETS);
-  const [pendingQueue, setPendingQueue] = useState<PendingAdjustment[]>(INITIAL_PENDING_ADJUSTMENTS);
+  const [wallets, setWallets] = useState<WalletAccount[]>([]);
+  const [pendingQueue, setPendingQueue] = useState<PendingAdjustment[]>([]);
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>(INITIAL_SECURITY_LOGS);
   const [timelineEvents, setTimelineEvents] = useState(FUNDING_TIMELINE_EVENTS);
 
@@ -273,6 +281,20 @@ export default function AdminWalletManagement() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportType, setExportType] = useState<'csv' | 'pdf'>('csv');
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([getAdminWallets(), getAdminWalletAdjustments()])
+      .then(([walletData, adjustmentData]) => {
+        if (!active) return;
+        setWallets(walletData);
+        setPendingQueue(adjustmentData);
+      })
+      .catch((error) => console.error('Failed to load admin wallet data:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Helper Toast notification trigger
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -304,7 +326,7 @@ export default function AdminWalletManagement() {
   const filteredWallets = useMemo(() => {
     return wallets.filter(wallet => {
       // Global Search
-      const searchMatch = searchQuery === '' || 
+      const searchMatch = searchQuery === '' ||
         wallet.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
         wallet.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         wallet.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -332,8 +354,8 @@ export default function AdminWalletManagement() {
         return sortDirection === 'asc' ? a.totalFunding - b.totalFunding : b.totalFunding - a.totalFunding;
       } else {
         // Last Activity Sorting (Simple alpha check on last activity labels)
-        return sortDirection === 'asc' 
-          ? a.lastActivity.localeCompare(b.lastActivity) 
+        return sortDirection === 'asc'
+          ? a.lastActivity.localeCompare(b.lastActivity)
           : b.lastActivity.localeCompare(a.lastActivity);
       }
     });
@@ -360,19 +382,33 @@ export default function AdminWalletManagement() {
   };
 
   // Re-run simulator refresh
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setWallets(INITIAL_WALLETS);
-      setLoading(false);
+    try {
+      const [walletData, adjustmentData] = await Promise.all([
+        getAdminWallets(),
+        getAdminWalletAdjustments(),
+      ]);
+      setWallets(walletData);
+      setPendingQueue(adjustmentData);
       triggerToast('Wallet parameters updated.');
-    }, 750);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh wallets.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Drawer trigger freeze action
-  const handleFreezeWallet = (id: string, newStatus: 'Active' | 'Frozen') => {
+  const handleFreezeWallet = async (id: string, newStatus: 'Active' | 'Frozen') => {
+    try {
+      await updateAdminWalletStatus(id, newStatus);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to update wallet status.');
+      return;
+    }
     setWallets(prev => prev.map(w => w.id === id ? { ...w, status: newStatus } : w));
-    
+
     // Add logs
     const targetWallet = wallets.find(w => w.id === id);
     if (targetWallet) {
@@ -392,7 +428,7 @@ export default function AdminWalletManagement() {
   };
 
   // Adjustment Confirm Action
-  const handleConfirmAdjustment = (e: React.FormEvent) => {
+  const handleConfirmAdjustment = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const targetVal = parseFloat(adjustAmount);
@@ -406,55 +442,22 @@ export default function AdminWalletManagement() {
       return;
     }
 
-    // High amount needs Approval Queue if above 50,000
-    if (targetVal >= 50000) {
-      const newPending: PendingAdjustment = {
-        id: `ADJ-${Math.floor(Math.random() * 900) + 100}`,
-        userId: adjustTargetUser || 'SWT-001245',
-        user: wallets.find(w => w.id === adjustTargetUser)?.user || 'Michael Anazodo',
-        email: wallets.find(w => w.id === adjustTargetUser)?.email || 'michael@example.com',
+    let createdAdjustment: PendingAdjustment;
+    try {
+      createdAdjustment = await createAdminWalletAdjustment({
+        userId: adjustTargetUser,
         actionType: adjustType,
         amount: targetVal,
         reason: adjustReason,
-        reference: adjustRef || `REF-ADJ-${Math.floor(Math.random() * 90000) + 10000}`,
-        submitted: '2026-06-20',
-        status: 'Pending'
-      };
-
-      setPendingQueue(prev => [newPending, ...prev]);
-
-      // Add to security log alert
-      const newSecLog: SecurityLog = {
-        id: `SEC-W-${Math.floor(Math.random() * 900) + 100}`,
-        type: 'Large Adjustment Requested',
-        details: `Manual adjustment of ₦${targetVal.toLocaleString()} requested for ${newPending.user}.`,
-        riskLevel: 'High',
-        timestamp: 'Just now',
-        admin: 'Current Admin'
-      };
-      setSecurityLogs(prev => [newSecLog, ...prev]);
-
-      triggerToast('Adjustment requires supervisor review. Added to Pending Approvals Queue.');
-    } else {
-      // Under 50,000 executes immediately!
-      setWallets(prev => prev.map(w => {
-        if (w.id === adjustTargetUser) {
-          const isCredit = adjustType === 'Credit' || adjustType === 'Refund';
-          const newBal = isCredit 
-            ? w.availableBalance + targetVal 
-            : Math.max(w.availableBalance - targetVal, 0);
-          return { 
-            ...w, 
-            availableBalance: newBal,
-            totalFunding: isCredit ? w.totalFunding + targetVal : w.totalFunding,
-            lastActivity: 'Just now • Adjusted' 
-          };
-        }
-        return w;
-      }));
-
-      triggerToast(`Adjustment executed. ${adjustType}ed ₦${targetVal.toLocaleString()} to wallet balance.`);
+        reference: adjustRef || undefined,
+      });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to submit wallet adjustment.');
+      return;
     }
+
+    setPendingQueue(prev => [createdAdjustment, ...prev.filter(item => item.id !== createdAdjustment.id)]);
+    triggerToast(createdAdjustment.status === 'Pending' ? 'Adjustment submitted for review. Balance changes only after approval.' : 'This adjustment request already exists.');
 
     // Reset Form
     setAdjustTargetUser('');
@@ -466,37 +469,26 @@ export default function AdminWalletManagement() {
   };
 
   // Queue Approval / Rejection
-  const handleApproveAdjustment = (reqId: string, action: 'Approved' | 'Rejected') => {
-    setPendingQueue(prev => prev.map(p => p.id === reqId ? { ...p, status: action } : p));
-    
-    const request = pendingQueue.find(p => p.id === reqId);
-    if (request) {
-      if (action === 'Approved') {
-        setWallets(prev => prev.map(w => {
-          if (w.id === request.userId) {
-            const isCredit = request.actionType === 'Credit' || request.actionType === 'Refund';
-            const newBal = isCredit 
-              ? w.availableBalance + request.amount 
-              : Math.max(w.availableBalance - request.amount, 0);
-            return {
-              ...w,
-              availableBalance: newBal,
-              totalFunding: isCredit ? w.totalFunding + request.amount : w.totalFunding,
-              lastActivity: 'Just now • Approved ADJ'
-            };
-          }
-          return w;
-        }));
-        triggerToast(`Adjustment Approved. Account credited/debited ₦${request.amount.toLocaleString()}.`);
-      } else {
-        triggerToast(`Adjustment Request ${reqId} rejected.`);
-      }
+  const handleApproveAdjustment = async (reqId: string, action: 'Approved' | 'Rejected') => {
+    try {
+      await reviewAdminWalletAdjustment(reqId, { status: action });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to review adjustment.');
+      return;
     }
+    try {
+      const [walletData, adjustmentData] = await Promise.all([getAdminWallets(), getAdminWalletAdjustments()]);
+      setWallets(walletData); setPendingQueue(adjustmentData);
+      triggerToast(action === 'Approved' ? 'Adjustment approved. Wallet balances refreshed.' : 'Adjustment rejected.');
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Review saved; refresh to see current balances.'); }
   };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">
-      
+      <AdminLoadMore items={wallets} load={getAdminWallets} onLoaded={setWallets} label="Load more wallets" />
+      <AdminLoadMore items={pendingQueue} load={getAdminWalletAdjustments} onLoaded={setPendingQueue} label="Load more adjustments" />
+
+
       {/* Toast Notice Feedback */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-blue-600 border border-blue-400 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
@@ -545,7 +537,7 @@ export default function AdminWalletManagement() {
 
         {/* ─── KPI OVERVIEW CARDS ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          
+
           {/* Card 1: Total Wallet Balance */}
           <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between hover:scale-102 hover:shadow-lg transition-all duration-200 group">
             <div className="flex items-center justify-between">
@@ -664,7 +656,7 @@ export default function AdminWalletManagement() {
 
         {/* ─── WALLET CONTROLS TOOLBAR ────────────────────────────────────────── */}
         <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xs">
-          
+
           <div className="flex flex-col lg:flex-row items-center gap-3">
             {/* Global search */}
             <div className="relative w-full lg:flex-1">
@@ -711,7 +703,7 @@ export default function AdminWalletManagement() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              
+
               {/* Status */}
               <div>
                 <label className="block text-[10px] font-semibold text-text-muted uppercase mb-1">Wallet Status</label>
@@ -797,10 +789,10 @@ export default function AdminWalletManagement() {
 
         {/* ─── WALLET ACCOUNTS TABLE & DETAILS DRAWER ─────────────────────────── */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-          
+
           {/* Table Container (2/3 Width) */}
           <div className="xl:col-span-2 bg-bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
-            
+
             <div className="p-5 border-b border-border flex items-center justify-between">
               <span className="text-text-white font-heading font-extrabold text-sm">Ledger Accounts</span>
               <span className="text-[10px] bg-blue-500/10 text-blue-500 px-2.5 py-1 rounded-full font-bold">
@@ -814,14 +806,14 @@ export default function AdminWalletManagement() {
                   <tr>
                     <th className="px-5 py-4">User</th>
                     <th className="px-4 py-4">Customer ID</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('availableBalance'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
                       Available Balance {sortField === 'availableBalance' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="px-4 py-4">Reserved</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('totalFunding'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -871,8 +863,8 @@ export default function AdminWalletManagement() {
                     </tr>
                   ) : (
                     paginatedWallets.map((wallet) => (
-                      <tr 
-                        key={wallet.id} 
+                      <tr
+                        key={wallet.id}
                         className="hover:bg-bg-dark-secondary/30 transition-colors cursor-pointer"
                         onClick={() => { setSelectedWallet(wallet); setIsDrawerOpen(true); }}
                       >
@@ -890,11 +882,10 @@ export default function AdminWalletManagement() {
                         <td className="px-4 py-4 text-text-muted">₦{wallet.reservedBalance.toLocaleString()}</td>
                         <td className="px-4 py-4 font-bold text-text-gray">₦{wallet.totalFunding.toLocaleString()}</td>
                         <td className="px-4 py-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            wallet.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${wallet.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                             wallet.status === 'Frozen' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          }`}>
+                              'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            }`}>
                             {wallet.status}
                           </span>
                         </td>
@@ -941,7 +932,7 @@ export default function AdminWalletManagement() {
                   </span>{' '}
                   of <span className="text-text-white font-bold">{sortedWallets.length}</span> entries
                 </span>
-                
+
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -954,11 +945,10 @@ export default function AdminWalletManagement() {
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(idx + 1)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                        currentPage === idx + 1 
-                          ? 'bg-blue-600 text-white shadow-xs' 
-                          : 'border border-border text-text-muted hover:text-text-white hover:bg-bg-card-hover'
-                      }`}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${currentPage === idx + 1
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'border border-border text-text-muted hover:text-text-white hover:bg-bg-card-hover'
+                        }`}
                     >
                       {idx + 1}
                     </button>
@@ -978,7 +968,7 @@ export default function AdminWalletManagement() {
 
           {/* Activity Logs Feed & Quick Actions (1/3 Width) */}
           <div className="space-y-6">
-            
+
             {/* Quick Actions Panel */}
             <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4">
               <div className="border-b border-border pb-2">
@@ -987,28 +977,28 @@ export default function AdminWalletManagement() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <button 
+                <button
                   onClick={() => { setAdjustType('Credit'); setAdjustTargetUser(wallets[0]?.id || ''); setShowAdjustModal(true); }}
                   className="p-3 bg-bg-dark-secondary/40 hover:bg-bg-dark-secondary/80 border border-border rounded-xl flex flex-col items-center gap-1.5 transition-all text-text-white font-bold"
                 >
                   <span className="text-emerald-500 font-extrabold text-sm">➕</span>
                   Credit Wallet
                 </button>
-                <button 
+                <button
                   onClick={() => { setAdjustType('Debit'); setAdjustTargetUser(wallets[0]?.id || ''); setShowAdjustModal(true); }}
                   className="p-3 bg-bg-dark-secondary/40 hover:bg-bg-dark-secondary/80 border border-border rounded-xl flex flex-col items-center gap-1.5 transition-all text-text-white font-bold"
                 >
                   <span className="text-red-500 font-extrabold text-sm">➖</span>
                   Debit Wallet
                 </button>
-                <button 
+                <button
                   onClick={() => triggerToast('Opening ledger audit list...')}
                   className="p-3 bg-bg-dark-secondary/40 hover:bg-bg-dark-secondary/80 border border-border rounded-xl flex flex-col items-center gap-1.5 transition-all text-text-white font-bold"
                 >
                   <span className="text-blue-500 text-sm">📊</span>
                   Financial Reports
                 </button>
-                <button 
+                <button
                   onClick={() => triggerToast('Redirecting to support adjust claims...')}
                   className="p-3 bg-bg-dark-secondary/40 hover:bg-bg-dark-secondary/80 border border-border rounded-xl flex flex-col items-center gap-1.5 transition-all text-text-white font-bold"
                 >
@@ -1085,9 +1075,8 @@ export default function AdminWalletManagement() {
                       <div className="text-[9px] text-text-muted">{p.email}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                        p.actionType === 'Credit' || p.actionType === 'Refund' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${p.actionType === 'Credit' || p.actionType === 'Refund' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'
+                        }`}>
                         {p.actionType}
                       </span>
                     </td>
@@ -1095,11 +1084,10 @@ export default function AdminWalletManagement() {
                     <td className="px-4 py-4 text-text-gray font-mono text-[10px]">{p.reference}</td>
                     <td className="px-4 py-4 text-text-muted">{p.submitted}</td>
                     <td className="px-4 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        p.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
                         p.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                        'bg-red-500/10 text-red-400 border border-red-500/25'
-                      }`}>
+                          'bg-red-500/10 text-red-400 border border-red-500/25'
+                        }`}>
                         {p.status}
                       </span>
                     </td>
@@ -1149,19 +1137,18 @@ export default function AdminWalletManagement() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {securityLogs.map((log) => (
-              <div 
-                key={log.id} 
+              <div
+                key={log.id}
                 className="bg-bg-dark-secondary/35 border border-border/50 rounded-xl p-4 flex flex-col justify-between hover:border-border-hover transition-colors"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-text-muted font-bold uppercase">{log.type}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      log.riskLevel === 'Critical' ? 'bg-red-500/15 text-red-400' :
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${log.riskLevel === 'Critical' ? 'bg-red-500/15 text-red-400' :
                       log.riskLevel === 'High' ? 'bg-orange-500/15 text-orange-400' :
-                      log.riskLevel === 'Medium' ? 'bg-amber-500/15 text-amber-400' :
-                      'bg-blue-500/15 text-blue-400'
-                    }`}>
+                        log.riskLevel === 'Medium' ? 'bg-amber-500/15 text-amber-400' :
+                          'bg-blue-500/15 text-blue-400'
+                      }`}>
                       {log.riskLevel}
                     </span>
                   </div>
@@ -1184,7 +1171,7 @@ export default function AdminWalletManagement() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            
+
             {/* Chart 1: Funding Trends */}
             <div className="bg-bg-dark-secondary/30 border border-border/50 rounded-xl p-4 space-y-3">
               <span className="text-[11px] font-bold text-text-white uppercase font-heading tracking-wider">Weekly Funding Channels (₦)</span>
@@ -1193,7 +1180,7 @@ export default function AdminWalletManagement() {
                   <AreaChart data={FUNDING_TRENDS_DATA}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" stroke="var(--bg-muted)" fontSize={10} />
-                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v/1000000}M`} />
+                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v / 1000000}M`} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }} />
                     <Area type="monotone" dataKey="Card" stackId="1" stroke="#06b6d4" fill="#06b6d4" fillOpacity={0.1} />
                     <Area type="monotone" dataKey="Transfer" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} />
@@ -1222,7 +1209,7 @@ export default function AdminWalletManagement() {
                         <Cell key={`cell-${idx}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }} formatter={(val) => `₦${(Number(val)/1000000).toFixed(1)}M`} />
+                    <Tooltip contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }} formatter={(val) => `₦${(Number(val) / 1000000).toFixed(1)}M`} />
                   </PieChart>
                 </ResponsiveContainer>
                 {/* Legend list */}
@@ -1309,9 +1296,9 @@ export default function AdminWalletManagement() {
       {isDrawerOpen && selectedWallet && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
           <div onClick={() => setIsDrawerOpen(false)} className="flex-1" />
-          
+
           <div className="w-full max-w-lg bg-bg-card border-l border-border h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-            
+
             {/* Drawer Header */}
             <div className="p-6 border-b border-border flex items-center justify-between bg-bg-dark-secondary/40">
               <div className="flex items-center gap-3">
@@ -1333,18 +1320,17 @@ export default function AdminWalletManagement() {
 
             {/* Scrollable contents */}
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              
+
               {/* Account Status Badge Header */}
               <div className="p-4 rounded-2xl bg-bg-dark-secondary/40 border border-border/80 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] uppercase font-bold text-text-muted tracking-wide">Status State</span>
                   <p className="text-text-white font-bold text-sm mt-0.5">{selectedWallet.status}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  selectedWallet.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${selectedWallet.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                   selectedWallet.status === 'Frozen' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                  'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }`}>
+                    'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  }`}>
                   {selectedWallet.status}
                 </span>
               </div>
@@ -1441,11 +1427,10 @@ export default function AdminWalletManagement() {
               </button>
               <button
                 onClick={() => handleFreezeWallet(selectedWallet.id, selectedWallet.status === 'Frozen' ? 'Active' : 'Frozen')}
-                className={`flex-1 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${
-                  selectedWallet.status === 'Frozen' 
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500' 
-                    : 'bg-bg-dark-secondary hover:bg-bg-card-hover text-text-white border-border'
-                }`}
+                className={`flex-1 py-2.5 text-xs font-semibold rounded-xl border transition-colors ${selectedWallet.status === 'Frozen'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500'
+                  : 'bg-bg-dark-secondary hover:bg-bg-card-hover text-text-white border-border'
+                  }`}
               >
                 {selectedWallet.status === 'Frozen' ? 'Unfreeze' : 'Freeze Wallet'}
               </button>
@@ -1465,7 +1450,7 @@ export default function AdminWalletManagement() {
       {showAdjustModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-6 relative shadow-2xl animate-in zoom-in-95 duration-200">
-            
+
             <button
               onClick={() => setShowAdjustModal(false)}
               className="absolute top-4 right-4 text-text-muted hover:text-text-white text-lg font-bold"
@@ -1479,7 +1464,7 @@ export default function AdminWalletManagement() {
             </p>
 
             <form onSubmit={handleConfirmAdjustment} className="space-y-4">
-              
+
               {/* User search */}
               <div>
                 <label className="block text-[10px] font-semibold text-text-muted uppercase mb-1.5">Target Wallet Account</label>
@@ -1507,11 +1492,10 @@ export default function AdminWalletManagement() {
                       key={type}
                       type="button"
                       onClick={() => setAdjustType(type)}
-                      className={`py-2 rounded-lg font-bold border transition-colors ${
-                        adjustType === type 
-                          ? 'bg-blue-600/10 border-blue-500 text-blue-500 shadow-xs' 
-                          : 'bg-bg-dark-secondary border-border text-text-gray'
-                      }`}
+                      className={`py-2 rounded-lg font-bold border transition-colors ${adjustType === type
+                        ? 'bg-blue-600/10 border-blue-500 text-blue-500 shadow-xs'
+                        : 'bg-bg-dark-secondary border-border text-text-gray'
+                        }`}
                     >
                       {type}
                     </button>
@@ -1619,7 +1603,7 @@ export default function AdminWalletManagement() {
             >
               ✕
             </button>
-            
+
             <h3 className="text-text-white font-heading font-extrabold text-base mb-2">Export Wallet Data</h3>
             <p className="text-text-gray text-xs mb-4">
               Select export parameter format and generate standard download reports.

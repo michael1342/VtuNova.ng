@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -23,6 +23,13 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import type { AnalyticsActivityLog as ActivityLog, AnalyticsOverview, ForecastData, GeographicInsight, Report, RevenueMetric, ServiceAnalytics, AnalyticsSystemAlert as SystemAlert } from '../../interface/admin.interface';
+import {
+  getAdminPendingReviewCount,
+  getAdminSuspendedCount,
+  getAdminTransactionCount,
+  getAdminTransactions,
+  getAdminUserCount,
+} from '../../api/admin';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -176,6 +183,43 @@ const ACTIVITY_TIMELINE: ActivityLog[] = [
   { id: 'ACT-303', event: 'Revenue Milestone: Platform crossed ₦80M Monthly Vol.', timestamp: '1d ago' }
 ];
 
+const loadOverviewMetrics = async (): Promise<AnalyticsOverview[]> => {
+  const [transactions, totalUsers, totalTransactions, pendingReview, suspendedUsers] = await Promise.all([
+    getAdminTransactions({ limit: 1000 }),
+    getAdminUserCount(),
+    getAdminTransactionCount(),
+    getAdminPendingReviewCount(),
+    getAdminSuspendedCount(),
+  ]);
+  const successfulTransactions = transactions.filter((transaction) => transaction.status === 'Success');
+  const purchases = successfulTransactions.filter((transaction) => transaction.service !== 'Wallet Funding');
+  const revenue = purchases.reduce((total, transaction) => total + transaction.amount, 0);
+  const profit = purchases.reduce((total, transaction) => total + (transaction.fee || 0), 0);
+  const walletFunding = successfulTransactions
+    .filter((transaction) => transaction.service === 'Wallet Funding')
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const metrics: { label: string; value: number; type: AnalyticsOverview['type'] }[] = [
+    { label: 'Revenue', value: revenue, type: 'money' },
+    { label: 'Profit', value: profit, type: 'money' },
+    { label: 'Transactions', value: totalTransactions, type: 'number' },
+    { label: 'Users', value: totalUsers, type: 'number' },
+    { label: 'Wallet Funding', value: walletFunding, type: 'money' },
+    { label: 'Success Rate', value: transactions.length ? (successfulTransactions.length / transactions.length) * 100 : 0, type: 'percentage' },
+    { label: 'Pending Review', value: pendingReview, type: 'number' },
+    { label: 'Suspended Users', value: suspendedUsers, type: 'number' },
+  ];
+
+  return metrics.map((metric) => ({
+    id: metric.label.toLowerCase().replaceAll(' ', '-'),
+    label: metric.label,
+    value: metric.type === 'money' ? `₦${metric.value.toLocaleString()}` : metric.type === 'percentage' ? `${metric.value.toFixed(1)}%` : metric.value,
+    change: 'Current totals',
+    isPositive: true,
+    type: metric.type,
+    sparkline: [],
+  }));
+};
+
 export default function AdminAnalytics() {
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
   const [overviewKPIs, setOverviewKPIs] = useState<AnalyticsOverview[]>(INITIAL_OVERVIEW);
@@ -184,6 +228,18 @@ export default function AdminAnalytics() {
   const [timelineLogs, setTimelineLogs] = useState<ActivityLog[]>(ACTIVITY_TIMELINE);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadOverviewMetrics()
+      .then((data) => {
+        if (active) setOverviewKPIs(data);
+      })
+      .catch((error) => console.error('Failed to load analytics overview:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Time scope switches
   const [revenueTimeScope, setRevenueTimeScope] = useState<'monthly' | 'weekly'>('monthly');
@@ -236,16 +292,17 @@ export default function AdminAnalytics() {
     triggerToast('Analytics filters reset.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setOverviewKPIs(INITIAL_OVERVIEW);
-      setReports(INITIAL_REPORTS);
-      setAlerts(SYSTEM_ALERTS);
-      setTimelineLogs(ACTIVITY_TIMELINE);
-      setLoading(false);
+    try {
+      const data = await loadOverviewMetrics();
+      setOverviewKPIs(data);
       triggerToast('Analytics datasets synchronized.');
-    }, 800);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh analytics.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Report creation
@@ -357,9 +414,8 @@ export default function AdminAnalytics() {
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider block truncate">{kpi.label}</span>
               <div className="flex flex-col gap-0.5">
                 <span className="text-sm font-extrabold text-text-white font-heading truncate">{kpi.value}</span>
-                <span className={`text-[9px] font-bold ${
-                  kpi.change.startsWith('+') ? 'text-emerald-400' : 'text-text-muted'
-                }`}>
+                <span className={`text-[9px] font-bold ${kpi.change.startsWith('+') ? 'text-emerald-400' : 'text-text-muted'
+                  }`}>
                   {kpi.change}
                 </span>
               </div>
@@ -505,17 +561,15 @@ export default function AdminAnalytics() {
             <div className="flex bg-bg-dark border border-border p-1 rounded-xl shrink-0 self-start sm:self-auto">
               <button
                 onClick={() => setRevenueTimeScope('monthly')}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${
-                  revenueTimeScope === 'monthly' ? 'bg-primary text-white' : 'text-text-muted hover:text-text-white'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${revenueTimeScope === 'monthly' ? 'bg-primary text-white' : 'text-text-muted hover:text-text-white'
+                  }`}
               >
                 Monthly Trend
               </button>
               <button
                 onClick={() => setRevenueTimeScope('weekly')}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${
-                  revenueTimeScope === 'weekly' ? 'bg-primary text-white' : 'text-text-muted hover:text-text-white'
-                }`}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${revenueTimeScope === 'weekly' ? 'bg-primary text-white' : 'text-text-muted hover:text-text-white'
+                  }`}
               >
                 Weekly Trend
               </button>
@@ -768,10 +822,9 @@ export default function AdminAnalytics() {
                     <span className="font-bold text-text-white block">{srv.server}</span>
                     <span className="text-[9px] text-text-muted block mt-0.5">Uptime: {srv.uptime} • Latency: {srv.latency}</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${
-                    srv.status === 'Healthy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                  <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${srv.status === 'Healthy' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                     'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
+                    }`}>
                     {srv.status}
                   </span>
                 </div>
@@ -816,10 +869,9 @@ export default function AdminAnalytics() {
                 <div key={alert.id} className="bg-bg-dark-secondary/35 border border-border rounded-xl p-3 space-y-1.5 relative group hover:border-red-500/30 transition">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-text-white block">{alert.title}</span>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold ${
-                      alert.severity === 'High' ? 'bg-red-500/20 text-red-400' :
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold ${alert.severity === 'High' ? 'bg-red-500/20 text-red-400' :
                       'bg-amber-500/10 text-amber-400'
-                    }`}>
+                      }`}>
                       {alert.severity}
                     </span>
                   </div>

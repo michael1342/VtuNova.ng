@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -20,6 +20,13 @@ import {
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
 import type { AgentPerformance, EscalatedCase, KnowledgeBaseArticle, SLAStatus, SupportActivityLog as ActivityLog, SupportAgent, SupportCustomer as Customer, SupportSystemAlert as SystemAlert, SupportTicket, TicketMessage } from '../../interface/admin.interface';
+import {
+  createAdminSupportTicket,
+  getAdminTicketMessages,
+  getAdminSupportTickets,
+  sendAdminTicketReply,
+  updateAdminSupportTicket,
+} from '../../api/adminSupport';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -194,6 +201,33 @@ export default function AdminSupport() {
   const [newTicketCategory, setNewTicketCategory] = useState<SupportTicket['category']>('Payments');
   const [newTicketDesc, setNewTicketDesc] = useState('');
 
+  useEffect(() => {
+    let active = true;
+    getAdminSupportTickets()
+      .then((data) => {
+        if (active) setTickets(data);
+      })
+      .catch((error) => console.error('Failed to load support tickets:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTicket) return;
+    let active = true;
+    getAdminTicketMessages(selectedTicket.id)
+      .then((messages) => {
+        if (active) {
+          setTimelineThreads(prev => ({ ...prev, [selectedTicket.id]: messages }));
+        }
+      })
+      .catch((error) => console.error('Failed to load ticket messages:', error));
+    return () => {
+      active = false;
+    };
+  }, [selectedTicket?.id]);
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -231,17 +265,16 @@ export default function AdminSupport() {
     triggerToast('Filters reset.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setTickets(INITIAL_TICKETS);
-      setTimelineThreads(TICKET_THREADS);
-      setEscalations(ESCALATIONS_LIST);
-      setAlerts(SYSTEM_ALERTS);
-      setTimelineLogs(ACTIVITY_TIMELINE);
-      setLoading(false);
+    try {
+      setTickets(await getAdminSupportTickets());
       triggerToast('Support registry reconciled.');
-    }, 700);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh support tickets.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Row selection handler
@@ -293,7 +326,7 @@ export default function AdminSupport() {
   };
 
   // Reply submit handler
-  const handleSendReply = () => {
+  const handleSendReply = async () => {
     if (!selectedTicket) return;
     if (!replyText && !internalNote) {
       triggerToast('Please type a reply message or internal memo.');
@@ -301,7 +334,13 @@ export default function AdminSupport() {
     }
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await sendAdminTicketReply(selectedTicket.id, {
+        message: replyText || undefined,
+        internalNote: internalNote || undefined,
+        status: replyTargetStatus,
+        assignedTo: assignedStaff || undefined,
+      });
       // Append reply to threads
       if (replyText) {
         const newMsg: TicketMessage = {
@@ -337,12 +376,21 @@ export default function AdminSupport() {
       setReplyText('');
       setInternalNote('');
       setIsWorkspaceOpen(false);
-      setLoading(false);
       triggerToast(`Response successfully dispatched. Ticket status updated to: ${replyTargetStatus}`);
-    }, 800);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to send ticket reply.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleQuickResolve = (id: string) => {
+  const handleQuickResolve = async (id: string) => {
+    try {
+      await updateAdminSupportTicket(id, { status: 'Resolved' });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to resolve ticket.');
+      return;
+    }
     setTickets(prev =>
       prev.map(t => (t.id === id ? { ...t, status: 'Resolved' as const, updatedDate: '2026-06-20' } : t))
     );
@@ -355,28 +403,25 @@ export default function AdminSupport() {
   };
 
   // New ticket submission
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTicketUserEmail || !newTicketSubject || !newTicketDesc) {
       triggerToast('Please complete all support ticket details.');
       return;
     }
-    const nextId = `SUP-${Math.floor(10000 + Math.random() * 9000)}`;
-    const newTicket: SupportTicket = {
-      id: nextId,
-      customerId: 'USR-8890',
-      customerName: 'External Client',
-      customerEmail: newTicketUserEmail,
-      subject: newTicketSubject,
-      description: newTicketDesc,
-      category: newTicketCategory,
-      priority: 'Medium',
-      assignedTo: 'Support Team A',
-      status: 'Open',
-      updatedDate: new Date().toISOString().split('T')[0],
-      createdDate: new Date().toISOString().split('T')[0] + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      tags: [newTicketCategory]
-    };
+    let newTicket: SupportTicket;
+    try {
+      newTicket = await createAdminSupportTicket({
+        customerEmail: newTicketUserEmail,
+        subject: newTicketSubject,
+        description: newTicketDesc,
+        category: newTicketCategory,
+      });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to create support ticket.');
+      return;
+    }
+    const nextId = newTicket.id;
 
     setTickets(prev => [newTicket, ...prev]);
     setTimelineThreads(prev => ({
@@ -768,9 +813,8 @@ export default function AdminSupport() {
                     return (
                       <tr
                         key={t.id}
-                        className={`hover:bg-bg-card-hover/40 transition-colors ${
-                          isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
-                        }`}
+                        className={`hover:bg-bg-card-hover/40 transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
+                          }`}
                       >
                         <td className="py-3.5 px-4">
                           <input
@@ -790,28 +834,25 @@ export default function AdminSupport() {
                         </td>
                         <td className="py-3.5 px-4 text-text-muted">{t.category}</td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            t.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            t.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${t.priority === 'Critical' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              t.priority === 'High' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
                             {t.priority}
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-text-muted">{t.assignedTo}</td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
-                            t.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            t.status === 'In Progress' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                            t.status === 'Waiting' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            'bg-red-500/10 text-red-400 border border-red-500/20'
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              t.status === 'Resolved' ? 'bg-emerald-400' :
-                              t.status === 'In Progress' ? 'bg-blue-400' :
-                              t.status === 'Waiting' ? 'bg-amber-400' :
-                              'bg-red-400'
-                            }`} />
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${t.status === 'Resolved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              t.status === 'In Progress' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                t.status === 'Waiting' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}>
+                            <span className={`w-1 h-1 rounded-full ${t.status === 'Resolved' ? 'bg-emerald-400' :
+                                t.status === 'In Progress' ? 'bg-blue-400' :
+                                  t.status === 'Waiting' ? 'bg-amber-400' :
+                                    'bg-red-400'
+                              }`} />
                             {t.status}
                           </span>
                         </td>
@@ -877,11 +918,10 @@ export default function AdminSupport() {
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`px-2.5 py-1 rounded ${
-                      currentPage === i + 1
+                    className={`px-2.5 py-1 rounded ${currentPage === i + 1
                         ? 'bg-primary text-white font-bold'
                         : 'bg-bg-card border border-border text-text-white hover:bg-bg-card-hover'
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -910,9 +950,8 @@ export default function AdminSupport() {
               {SLA_STATS.map(stat => (
                 <div key={stat.label} className="bg-bg-dark-secondary/35 border border-border rounded-xl p-3 text-center space-y-1 hover:border-primary/10 transition">
                   <span className="text-[9px] font-bold text-text-muted uppercase block truncate">{stat.label}</span>
-                  <span className={`text-[11px] font-extrabold block ${
-                    stat.status === 'Healthy' ? 'text-emerald-400' : 'text-amber-400'
-                  }`}>
+                  <span className={`text-[11px] font-extrabold block ${stat.status === 'Healthy' ? 'text-emerald-400' : 'text-amber-400'
+                    }`}>
                     {stat.value}
                   </span>
                 </div>
@@ -950,10 +989,9 @@ export default function AdminSupport() {
                       <td className="py-2.5 text-text-muted max-w-[200px] truncate" title={esc.reason}>{esc.reason}</td>
                       <td className="py-2.5 text-text-white font-medium">{esc.assignedTeam}</td>
                       <td className="py-2.5">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${
-                          esc.priority === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                          'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${esc.priority === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                            'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
                           {esc.priority}
                         </span>
                       </td>
@@ -1149,7 +1187,7 @@ export default function AdminSupport() {
 
                   {/* Body Content split grid */}
                   <div className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-y-auto">
-                    
+
                     {/* Left Panel: Ticket Detail & Customer Context */}
                     <div className="space-y-4 overflow-y-auto pr-1">
                       <div className="bg-bg-dark-secondary/40 border border-border rounded-2xl p-4.5 space-y-4">
@@ -1217,7 +1255,7 @@ export default function AdminSupport() {
 
                     {/* Right Panel: Resolution Conversation timeline & editor */}
                     <div className="space-y-4 flex flex-col justify-between overflow-y-auto pl-0 lg:pl-4 border-t lg:border-t-0 lg:border-l border-border/50 pt-4 lg:pt-0">
-                      
+
                       {/* Timeline chat messages */}
                       <div className="space-y-3 flex-1 overflow-y-auto max-h-[300px] mb-4 pr-1">
                         <span className="text-[10px] font-bold text-text-white uppercase tracking-wider block mb-1">Conversation Thread</span>
@@ -1226,11 +1264,10 @@ export default function AdminSupport() {
                             const isCustomer = msg.sender === 'Customer';
                             return (
                               <div key={index} className={`flex flex-col ${isCustomer ? 'items-start' : 'items-end'}`}>
-                                <div className={`max-w-[85%] rounded-xl p-3 text-[11px] leading-relaxed ${
-                                  isCustomer
+                                <div className={`max-w-[85%] rounded-xl p-3 text-[11px] leading-relaxed ${isCustomer
                                     ? 'bg-bg-dark-secondary border border-border text-text-white rounded-tl-none'
                                     : 'bg-primary/10 border border-primary/20 text-text-white rounded-tr-none'
-                                }`}>
+                                  }`}>
                                   <span className="block font-bold text-[9px] text-primary mb-1 uppercase">{msg.senderName}</span>
                                   {msg.message}
                                 </div>

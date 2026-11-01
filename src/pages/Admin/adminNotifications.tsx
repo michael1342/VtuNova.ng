@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import AdminLoadMore from '../../components/AdminLoadMore';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -27,6 +28,15 @@ import {
   PauseIcon
 } from '@heroicons/react/24/outline';
 import type { AudienceInsight, FailedNotification, NotificationActivityLog as ActivityLog, NotificationCampaign, NotificationTemplate } from '../../interface/admin.interface';
+import {
+  createAdminCampaign,
+  getAdminCampaigns,
+  getAdminNotificationActivity,
+  getAdminNotificationFailures,
+  getAdminNotificationTemplates,
+  retryAdminNotification,
+  updateAdminCampaignStatus,
+} from '../../api/adminNotifications';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -43,7 +53,7 @@ const INITIAL_CAMPAIGNS: NotificationCampaign[] = [
     date: '2026-06-20',
     time: '12:00:00',
     buttonLabel: 'Fund Now',
-    buttonUrl: 'https://vtunova.com/user/fund',
+    buttonUrl: 'https://vtunova.cv/user/fund',
     timezone: 'WAT',
     timeline: {
       created: '10:00 AM',
@@ -65,7 +75,7 @@ const INITIAL_CAMPAIGNS: NotificationCampaign[] = [
     date: '2026-06-19',
     time: '15:30:00',
     buttonLabel: 'Verify Session',
-    buttonUrl: 'https://vtunova.com/user/profile',
+    buttonUrl: 'https://vtunova.cv/user/profile',
     timezone: 'WAT',
     timeline: {
       created: '14:00 PM',
@@ -174,18 +184,40 @@ const CHANNEL_PERFORMANCE_BARS = [
 
 export default function AdminNotifications() {
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [campaigns, setCampaigns] = useState<NotificationCampaign[]>(INITIAL_CAMPAIGNS);
-  const [failures, setFailures] = useState<FailedNotification[]>(INITIAL_FAILURES);
-  const [templates, setTemplates] = useState<NotificationTemplate[]>(TEMPLATES);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(ACTIVITY_LOGS);
+  const [campaigns, setCampaigns] = useState<NotificationCampaign[]>([]);
+  const [failures, setFailures] = useState<FailedNotification[]>([]);
+  const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      getAdminCampaigns(),
+      getAdminNotificationFailures(),
+      getAdminNotificationTemplates(),
+      getAdminNotificationActivity(),
+    ])
+      .then(([campaignData, failureData, templateData, activityData]) => {
+        if (!active) return;
+        setCampaigns(campaignData);
+        setFailures(failureData);
+        setTemplates(templateData);
+        setActivityLogs(activityData);
+      })
+      .catch((error) => console.error('Failed to load notification data:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Form State (New Notification slide-out drawer)
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState('');
   const [composerMessage, setComposerMessage] = useState('');
   const [composerType, setComposerType] = useState<NotificationCampaign['type']>('Announcement');
+  const [composerUserIds, setComposerUserIds] = useState('');
   const [composerAudience, setComposerAudience] = useState<NotificationCampaign['audience']>('All Users');
   const [composerChannels, setComposerChannels] = useState<NotificationCampaign['channels']>(['In-App']);
   const [composerSchedule, setComposerSchedule] = useState<'now' | 'later'>('now');
@@ -234,13 +266,13 @@ export default function AdminNotifications() {
 
   // Compose dynamic channel toggles
   const handleComposerChannelToggle = (ch: NotificationCampaign['channels'][number]) => {
-    setComposerChannels(prev => 
+    setComposerChannels(prev =>
       prev.includes(ch) ? prev.filter(item => item !== ch) : [...prev, ch]
     );
   };
 
   // Handlers for Compose Form Action
-  const handleCreateNotification = (status: 'Draft' | 'Sent' | 'Scheduled') => {
+  const handleCreateNotification = async (status: 'Draft' | 'Sent' | 'Scheduled') => {
     if (!composerTitle || !composerMessage) {
       triggerToast('Title and Message content details are required.');
       return;
@@ -251,17 +283,14 @@ export default function AdminNotifications() {
     }
 
     setLoading(true);
-
-    setTimeout(() => {
-      const count = composerAudience === 'All Users' ? 18420 : composerAudience === 'VIP Users' ? 2450 : 850;
-      const newCampaign: NotificationCampaign = {
-        id: `NOT-${Math.floor(10000 + Math.random() * 9000)}`,
+    try {
+      const newCampaign = await createAdminCampaign({
         title: composerTitle,
         message: composerMessage,
         type: composerType,
         audience: composerAudience,
+        ...(['Specific Users', 'User Segments'].includes(composerAudience) ? { userIds: composerUserIds.split(/[\s,]+/).filter(Boolean) } : {}),
         channels: composerChannels,
-        sentCount: status === 'Draft' ? 0 : count,
         status: status,
         date: new Date().toISOString().split('T')[0],
         time: new Date().toLocaleTimeString(),
@@ -269,25 +298,13 @@ export default function AdminNotifications() {
         buttonUrl: composerButtonUrl || undefined,
         timezone: composerTimezone,
         scheduledTime: status === 'Scheduled' ? composerDateTime : undefined,
-        timeline: {
-          created: 'Just now',
-          scheduled: status === 'Scheduled' ? 'Just now' : undefined,
-          sending: status === 'Sent' ? 'Just now' : undefined,
-          delivered: status === 'Sent' ? 'Just now' : undefined
-        }
-      };
+      });
 
       setCampaigns(prev => [newCampaign, ...prev]);
 
-      // Add log
-      const newLog: ActivityLog = {
-        id: `ACT-${Math.floor(10 + Math.random() * 90)}`,
-        event: `${status === 'Sent' ? 'Notification Sent' : status === 'Scheduled' ? 'Campaign Scheduled' : 'Draft Created'}: ${composerTitle}`,
-        adminName: 'Michael Anazodo',
-        timestamp: 'Just now'
-      };
-      setActivityLogs(prev => [newLog, ...prev]);
+      setActivityLogs(await getAdminNotificationActivity());
 
+      setComposerUserIds('');
       // Reset Form State
       setComposerTitle('');
       setComposerMessage('');
@@ -301,8 +318,11 @@ export default function AdminNotifications() {
       setIsComposerOpen(false);
 
       setLoading(false);
-      triggerToast(`Notification campaign saved successfully as ${status}.`);
-    }, 850);
+      triggerToast(`Notification campaign saved as ${newCampaign.status}.`);
+    } catch (error) {
+      setLoading(false);
+      triggerToast(error instanceof Error ? error.message : 'Failed to save notification campaign.');
+    }
   };
 
   const handleApplyFilters = () => {
@@ -338,21 +358,30 @@ export default function AdminNotifications() {
     triggerToast('Outbox filters reset.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setCampaigns(INITIAL_CAMPAIGNS);
-      setFailures(INITIAL_FAILURES);
-      setTemplates(TEMPLATES);
-      setActivityLogs(ACTIVITY_LOGS);
-      setLoading(false);
+    try {
+      const [campaignData, failureData, templateData, activityData] = await Promise.all([
+        getAdminCampaigns(),
+        getAdminNotificationFailures(),
+        getAdminNotificationTemplates(),
+        getAdminNotificationActivity(),
+      ]);
+      setCampaigns(campaignData);
+      setFailures(failureData);
+      setTemplates(templateData);
+      setActivityLogs(activityData);
       triggerToast('Notifications dashboard reconciled.');
-    }, 750);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh notifications.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Row selection handler
   const handleSelectRow = (id: string) => {
-    setSelectedSubIds(prev => 
+    setSelectedSubIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -378,7 +407,7 @@ export default function AdminNotifications() {
   // Table Filter Logic
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter(c => {
-      const searchMatch = appliedSearch === '' || 
+      const searchMatch = appliedSearch === '' ||
         c.id.toLowerCase().includes(appliedSearch.toLowerCase()) ||
         c.title.toLowerCase().includes(appliedSearch.toLowerCase()) ||
         c.message.toLowerCase().includes(appliedSearch.toLowerCase()) ||
@@ -434,6 +463,7 @@ export default function AdminNotifications() {
     setComposerMessage(c.message);
     setComposerType(c.type);
     setComposerAudience(c.audience);
+    setComposerUserIds((c.userIds || []).join(', '));
     setComposerChannels(c.channels);
     setComposerButtonLabel(c.buttonLabel || '');
     setComposerButtonUrl(c.buttonUrl || '');
@@ -441,23 +471,31 @@ export default function AdminNotifications() {
     triggerToast('Campaign contents loaded into Composer drawer.');
   };
 
-  const handlePause = (id: string) => {
-    setCampaigns(prev => prev.map(c => {
-      if (c.id === id) {
-        return { ...c, status: c.status === 'Sending' ? 'Draft' : 'Sending' };
-      }
-      return c;
-    }));
+  const handlePause = async (id: string) => {
+    const campaign = campaigns.find(item => item.id === id);
+    if (!campaign) return;
+    const nextStatus = campaign.status === 'Sending' ? 'Draft' : 'Sending';
+    try {
+      await updateAdminCampaignStatus(id, nextStatus);
+      setCampaigns(await getAdminCampaigns());
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to update campaign status.');
+      return;
+    }
     triggerToast(`Delivery states updated for ${id}.`);
   };
 
-  const handleRetryFailure = (id: string) => {
+  const handleRetryFailure = async (id: string) => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await retryAdminNotification(id);
       setFailures(prev => prev.filter(f => f.id !== id));
+      triggerToast(`Retry queued for ${id}. Refresh to check delivery.`);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to retry notification.');
+    } finally {
       setLoading(false);
-      triggerToast(`Re-dispatched push/email packets for failure queue ${id}.`);
-    }, 1000);
+    }
   };
 
   const handleEditFailure = (item: FailedNotification) => {
@@ -503,6 +541,11 @@ export default function AdminNotifications() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark text-text-gray relative">
+      <AdminLoadMore items={campaigns} load={getAdminCampaigns} onLoaded={setCampaigns} label="Load more campaigns" />
+      <AdminLoadMore items={failures} load={getAdminNotificationFailures} onLoaded={setFailures} label="Load more failures" />
+      <AdminLoadMore items={templates} load={getAdminNotificationTemplates} onLoaded={setTemplates} label="Load more templates" />
+      <AdminLoadMore items={activityLogs} load={getAdminNotificationActivity} onLoaded={setActivityLogs} label="Load more activity" />
+
       {/* Toast popup */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 bg-bg-card border-l-4 border-primary text-text-white shadow-2xl px-5 py-3.5 rounded-r-xl flex items-center gap-3 animate-slide-in">
@@ -533,11 +576,11 @@ export default function AdminNotifications() {
           </span>
           <span className="flex items-center gap-1.5 text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            SendGrid SMTP Link: Active
+            Email delivery
           </span>
           <span className="flex items-center gap-1.5 text-amber-400">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            SMS Gateway Status: Warning (3.2s lag)
+            Available channels: Email and In-App
           </span>
         </div>
 
@@ -897,9 +940,8 @@ export default function AdminNotifications() {
                     return (
                       <tr
                         key={c.id}
-                        className={`hover:bg-bg-card-hover/40 transition-colors ${
-                          isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
-                        }`}
+                        className={`hover:bg-bg-card-hover/40 transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
+                          }`}
                       >
                         <td className="py-3.5 px-4">
                           <input
@@ -914,12 +956,11 @@ export default function AdminNotifications() {
                           {c.title}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            c.type === 'Security' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            c.type === 'Promotion' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                            c.type === 'System Update' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${c.type === 'Security' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                              c.type === 'Promotion' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                c.type === 'System Update' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
                             {c.type}
                           </span>
                         </td>
@@ -937,20 +978,18 @@ export default function AdminNotifications() {
                           {c.sentCount.toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
-                            c.status === 'Delivered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            c.status === 'Scheduled' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            c.status === 'Sending' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                            c.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                            'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20'
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              c.status === 'Delivered' ? 'bg-emerald-400' :
-                              c.status === 'Scheduled' ? 'bg-amber-400' :
-                              c.status === 'Sending' ? 'bg-blue-400' :
-                              c.status === 'Failed' ? 'bg-red-400' :
-                              'bg-zinc-400'
-                            }`} />
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${c.status === 'Delivered' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              c.status === 'Scheduled' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                c.status === 'Sending' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                  c.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                    'bg-zinc-500/15 text-zinc-400 border border-zinc-500/20'
+                            }`}>
+                            <span className={`w-1 h-1 rounded-full ${c.status === 'Delivered' ? 'bg-emerald-400' :
+                                c.status === 'Scheduled' ? 'bg-amber-400' :
+                                  c.status === 'Sending' ? 'bg-blue-400' :
+                                    c.status === 'Failed' ? 'bg-red-400' :
+                                      'bg-zinc-400'
+                              }`} />
                             {c.status}
                           </span>
                         </td>
@@ -1024,11 +1063,10 @@ export default function AdminNotifications() {
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`px-2.5 py-1 rounded ${
-                      currentPage === i + 1
+                    className={`px-2.5 py-1 rounded ${currentPage === i + 1
                         ? 'bg-primary text-white font-bold'
                         : 'bg-bg-card border border-border text-text-white hover:bg-bg-card-hover'
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -1423,18 +1461,17 @@ export default function AdminNotifications() {
                       <div className="space-y-2 bg-bg-dark-secondary/40 border border-border p-4.5 rounded-xl">
                         <label className="block text-[10px] font-bold text-text-white uppercase tracking-wider">Delivery Channels (Multi-select)</label>
                         <div className="grid grid-cols-2 gap-2.5 pt-1.5">
-                          {['In-App', 'Email', 'Push', 'SMS'].map((ch) => {
+                          {['In-App', 'Email'].map((ch) => {
                             const isChecked = composerChannels.includes(ch as any);
                             return (
                               <button
                                 key={ch}
                                 type="button"
                                 onClick={() => handleComposerChannelToggle(ch as any)}
-                                className={`py-2 px-3 rounded-lg border text-left flex items-center justify-between text-xs font-semibold ${
-                                  isChecked
+                                className={`py-2 px-3 rounded-lg border text-left flex items-center justify-between text-xs font-semibold ${isChecked
                                     ? 'border-primary bg-primary/10 text-white'
                                     : 'border-border bg-bg-dark hover:border-border-hover text-text-muted'
-                                }`}
+                                  }`}
                               >
                                 <span>{ch}</span>
                                 <input
@@ -1457,14 +1494,21 @@ export default function AdminNotifications() {
                           onChange={e => setComposerAudience(e.target.value as any)}
                           className="w-full text-xs px-2.5 py-2 bg-bg-dark border border-border rounded-lg text-text-white focus:outline-hidden"
                         >
-                          <option value="All Users">All Users (45,280)</option>
-                          <option value="Specific Users">Specific Users list (CSV)</option>
-                          <option value="User Segments">User Segments Group</option>
-                          <option value="Inactive Users">Inactive Users (4,200)</option>
-                          <option value="New Users">New Users (850)</option>
-                          <option value="VIP Users">VIP Users (2,450)</option>
+                          <option value="All Users">All active users</option>
+                          <option value="Specific Users">Specific users by ID</option>
+                          <option value="User Segments">Selected users by ID</option>
+                          <option value="Inactive Users">Inactive users</option>
+                          <option value="New Users">Users registered in the last 30 days</option>
+
                         </select>
                       </div>
+
+                      {['Specific Users', 'User Segments'].includes(composerAudience) && (
+                        <div className="space-y-2 bg-bg-dark-secondary/40 border border-border p-4 rounded-xl">
+                          <label className="block text-xs text-text-white" htmlFor="campaign-user-ids">Recipient user IDs (up to 500)</label>
+                          <textarea id="campaign-user-ids" value={composerUserIds} onChange={event => setComposerUserIds(event.target.value)} placeholder="Separate user IDs with commas or spaces" className="w-full text-xs p-3 bg-bg-dark border border-border rounded-lg text-text-white" />
+                        </div>
+                      )}
 
                       {/* Scheduling */}
                       <div className="space-y-3 bg-bg-dark-secondary/40 border border-border p-4.5 rounded-xl text-xs">
@@ -1732,10 +1776,9 @@ export default function AdminNotifications() {
                     {/* Status & summary */}
                     <div className="space-y-2 border-b border-border pb-4">
                       <div className="flex items-center justify-between">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          selectedCampaign.type === 'Security' ? 'bg-red-500/10 text-red-400 border border-red-500/15' :
-                          'bg-blue-500/10 text-blue-400 border border-blue-500/15'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedCampaign.type === 'Security' ? 'bg-red-500/10 text-red-400 border border-red-500/15' :
+                            'bg-blue-500/10 text-blue-400 border border-blue-500/15'
+                          }`}>
                           {selectedCampaign.type}
                         </span>
                         <span className="text-[10px] text-text-muted font-bold uppercase">{selectedCampaign.status}</span>
@@ -1788,9 +1831,8 @@ export default function AdminNotifications() {
                         </div>
 
                         <div className="relative">
-                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${
-                            selectedCampaign.status === 'Scheduled' ? 'bg-amber-400' : 'bg-primary'
-                          }`} />
+                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${selectedCampaign.status === 'Scheduled' ? 'bg-amber-400' : 'bg-primary'
+                            }`} />
                           <div className="text-xs">
                             <span className="font-bold text-text-white block">Scheduled Broadcast</span>
                             <span className="text-[10px] text-text-muted block">Timestamp: {selectedCampaign.timeline.scheduled || 'Completed'}</span>
@@ -1798,9 +1840,8 @@ export default function AdminNotifications() {
                         </div>
 
                         <div className="relative">
-                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${
-                            selectedCampaign.status === 'Sending' ? 'bg-blue-400' : 'bg-primary'
-                          }`} />
+                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${selectedCampaign.status === 'Sending' ? 'bg-blue-400' : 'bg-primary'
+                            }`} />
                           <div className="text-xs">
                             <span className="font-bold text-text-white block">Sending Queue Dispatch</span>
                             <span className="text-[10px] text-text-muted block">Timestamp: {selectedCampaign.timeline.sending || 'Completed'}</span>
@@ -1808,9 +1849,8 @@ export default function AdminNotifications() {
                         </div>
 
                         <div className="relative">
-                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${
-                            selectedCampaign.status === 'Delivered' ? 'bg-emerald-400' : 'bg-zinc-700'
-                          }`} />
+                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${selectedCampaign.status === 'Delivered' ? 'bg-emerald-400' : 'bg-zinc-700'
+                            }`} />
                           <div className="text-xs">
                             <span className="font-bold text-text-white block">Delivered Broadcasts Packet</span>
                             <span className="text-[10px] text-text-muted block">Timestamp: {selectedCampaign.timeline.delivered || 'Completed'}</span>
@@ -1818,9 +1858,8 @@ export default function AdminNotifications() {
                         </div>
 
                         <div className="relative">
-                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${
-                            selectedCampaign.status === 'Delivered' ? 'bg-emerald-400' : 'bg-zinc-700'
-                          }`} />
+                          <span className={`absolute -left-5 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-bg-card ${selectedCampaign.status === 'Delivered' ? 'bg-emerald-400' : 'bg-zinc-700'
+                            }`} />
                           <div className="text-xs">
                             <span className="font-bold text-text-white block">Completed Campaign Session</span>
                             <span className="text-[10px] text-text-muted block">Timestamp: {selectedCampaign.timeline.completed || 'Completed'}</span>

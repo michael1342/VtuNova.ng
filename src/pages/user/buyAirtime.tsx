@@ -237,14 +237,17 @@ const BuyAirtime: React.FC = () => {
         setShowPayModal(false);
         setSuccess(true);
         setErrorMessage(null);
+        // return
       } else {
         setLoading(false);
         setShowPayModal(false);
+        setSuccess(false);
+        setErrorMessage(res?.error || 'Transaction failed. Please try again.');
         triggerError(res?.error || 'Transaction failed. Please try again.');
         console.log(res?.error)
       }
 
-
+      
 
 
 

@@ -6,11 +6,18 @@ import generateRequestID from '../utils/generateRequestID';
 
 export type { VtuResponse as vtuResponse } from '../interface/api.interface';
 
+type VtuTransactionResponse = {
+    Vtu: { status: string };
+};
+
 export const buyData = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const request_id = generateRequestID();
-        const response = await http.post("/vtu/buy-data", {...data, request_id})
+        const response = await http.post("/vtu/buy-data", {...data, request_id}) as unknown as VtuTransactionResponse;
         if(!response) return 
+         if(response.Vtu.status === 'pending') {
+            return {response, success: false, error: 'Transaction is pending. Please check your connection and try again later.'};
+        }
         return {response, success: true, error: ''};
     } catch (err) {
         if (err instanceof ApiError) {
@@ -23,8 +30,11 @@ export const buyData = async (data: vtuData) : Promise<VtuResponse | undefined >
 export const buyAirtime = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const request_id = generateRequestID();
-        const response = await http.post("/vtu/buy-airtime", {...data, request_id})
-        // if(!response) return 
+        const response = await http.post("/vtu/buy-airtime", {...data, request_id}) as unknown as VtuTransactionResponse;
+        // if(!response) return
+        if(response.Vtu.status === 'pending') {
+            return {response, success: false, error: 'Transaction is pending. Please check your connection and try again later.'};
+        }
         console.log(response)
         return {response, success: true, error: ''};
     } catch (err) {
@@ -64,8 +74,11 @@ export const verifyMeter = async (data: vtuData) : Promise<VtuResponse | undefin
 export const buyElectricity = async (data: vtuData) : Promise<VtuResponse | undefined > => {
     try {
         const request_id = generateRequestID();
-        const response = await http.post("/vtu/buy-electricity", {...data, request_id})
+        const response = await http.post("/vtu/buy-electricity", {...data, request_id}) as unknown as VtuTransactionResponse;
         if(!response) return 
+         if(response.Vtu.status === 'pending') {
+            return {response, success: false, error: 'Transaction is pending. Please check your connection and try again later.'};
+        }
         return {response, success: true, error: ''};
     } catch (err) {
         if (err instanceof ApiError) {

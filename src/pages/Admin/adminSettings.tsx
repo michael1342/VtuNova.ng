@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
@@ -15,6 +15,7 @@ import {
   HeartIcon
 } from '@heroicons/react/24/outline';
 import type { FeeConfig, GeneralConfig, HistoryRecord, MaintenanceConfig, NotificationSettings, ProviderConfig, SecurityPolicy, ServiceConfig, SettingsSystemAlert as SystemAlert, SystemConfig, TransactionRules, WalletRules } from '../../interface/admin.interface';
+import { getAdminAuditHistory, getAdminSettings, updateAdminSettings } from '../../api/adminSettings';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL CONFIGURATIONS ──────────────────────────────────────────────────
@@ -147,6 +148,29 @@ export default function AdminSettings() {
   // Drawer modal states
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    Promise.all([getAdminSettings(), getAdminAuditHistory()])
+      .then(([settings, history]) => {
+        if (!active) return;
+        setGeneralConfig(settings.general);
+        setServicesConfig(settings.services);
+        setTransactionRules(settings.transactionRules);
+        setWalletRules(settings.walletRules);
+        setNotificationConfig(settings.notificationSettings);
+        setSecurityPolicy(settings.securityPolicy);
+        setProvidersConfig(settings.providers);
+        setFeeConfig(settings.fees);
+        setMaintenanceConfig(settings.maintenance);
+        setSystemConfig(settings.system);
+        setAuditLogs(history);
+      })
+      .catch((error) => console.error('Failed to load admin settings:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -190,12 +214,24 @@ export default function AdminSettings() {
     }, 1000);
   };
 
-  const handlePublishConfig = () => {
+  const handlePublishConfig = async () => {
     setLoading(true);
-    setTimeout(() => {
+    const settingsByTab = {
+      general: { general: generalConfig },
+      services: { services: servicesConfig },
+      transactions: { transactionRules },
+      wallet: { walletRules },
+      notifications: { notificationSettings: notificationConfig },
+      security: { securityPolicy },
+      providers: { providers: providersConfig },
+      fees: { fees: feeConfig },
+      maintenance: { maintenance: maintenanceConfig },
+      system: { system: systemConfig },
+    } as const;
+    try {
+      await updateAdminSettings(settingsByTab[activeTab]);
       setIsDirty(false);
       setIsDrawerOpen(false);
-      setLoading(false);
       triggerToast('Configuration changes committed to live gateways.');
 
       const newLog: HistoryRecord = {
@@ -207,7 +243,11 @@ export default function AdminSettings() {
         status: 'Successful'
       };
       setAuditLogs(prev => [newLog, ...prev]);
-    }, 900);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to publish configuration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -215,18 +255,29 @@ export default function AdminSettings() {
     triggerToast('Discarded modifications. Reloaded default configurations.');
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setGeneralConfig(INITIAL_GENERAL);
-      setServicesConfig(INITIAL_SERVICES);
-      setProvidersConfig(INITIAL_PROVIDERS);
-      setAuditLogs(AUDIT_HISTORY);
+    try {
+      const [settings, history] = await Promise.all([getAdminSettings(), getAdminAuditHistory()]);
+      setGeneralConfig(settings.general);
+      setServicesConfig(settings.services);
+      setTransactionRules(settings.transactionRules);
+      setWalletRules(settings.walletRules);
+      setNotificationConfig(settings.notificationSettings);
+      setSecurityPolicy(settings.securityPolicy);
+      setProvidersConfig(settings.providers);
+      setFeeConfig(settings.fees);
+      setMaintenanceConfig(settings.maintenance);
+      setSystemConfig(settings.system);
+      setAuditLogs(history);
       setAlerts(SYSTEM_ALERTS);
       setIsDirty(false);
-      setLoading(false);
       triggerToast('Refreshed configuration registry.');
-    }, 700);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh configuration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -332,11 +383,10 @@ export default function AdminSettings() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key as any)}
-                    className={`flex items-center gap-2.5 p-3.5 text-left w-full transition shrink-0 whitespace-nowrap lg:whitespace-normal ${
-                      isActive
+                    className={`flex items-center gap-2.5 p-3.5 text-left w-full transition shrink-0 whitespace-nowrap lg:whitespace-normal ${isActive
                         ? 'bg-primary/5 text-primary border-b-2 lg:border-b-0 lg:border-l-2 border-primary font-bold'
                         : 'text-text-muted hover:text-text-white hover:bg-bg-dark-secondary/30'
-                    }`}
+                      }`}
                   >
                     <IconComponent className={`w-4 h-4 ${isActive ? 'text-primary' : 'text-text-muted'}`} />
                     {tab.label}
@@ -350,7 +400,7 @@ export default function AdminSettings() {
           <div className="flex-1 w-full space-y-6">
             {/* Tab Views */}
             <div className="bg-bg-card border border-border rounded-2xl p-6 shadow-sm min-h-[420px]">
-              
+
               {/* TAB 1: General settings */}
               {activeTab === 'general' && (
                 <div className="space-y-5">
@@ -460,13 +510,11 @@ export default function AdminSettings() {
                           <button
                             type="button"
                             onClick={() => handleServiceToggle(srv.id)}
-                            className={`w-12 h-6 rounded-full p-0.5 transition-colors ${
-                              srv.enabled ? 'bg-primary' : 'bg-zinc-700'
-                            }`}
+                            className={`w-12 h-6 rounded-full p-0.5 transition-colors ${srv.enabled ? 'bg-primary' : 'bg-zinc-700'
+                              }`}
                           >
-                            <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                              srv.enabled ? 'translate-x-6' : 'translate-x-0'
-                            }`} />
+                            <div className={`w-5 h-5 rounded-full bg-white transition-transform ${srv.enabled ? 'translate-x-6' : 'translate-x-0'
+                              }`} />
                           </button>
                         </div>
                       </div>
@@ -779,9 +827,8 @@ export default function AdminSettings() {
                             <span className="font-extrabold text-text-white text-xs block">{prv.name}</span>
                             <span className="text-[9px] text-text-muted block mt-0.5">Type: {prv.type} • Target: {prv.environment}</span>
                           </div>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            prv.healthScore > 98 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${prv.healthScore > 98 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                            }`}>
                             Health: {prv.healthScore}%
                           </span>
                         </div>
@@ -816,11 +863,10 @@ export default function AdminSettings() {
                           <button
                             type="button"
                             onClick={() => handleProviderToggle(prv.id)}
-                            className={`px-3.5 py-1.5 border text-[9px] font-bold rounded-lg transition ${
-                              prv.enabled
+                            className={`px-3.5 py-1.5 border text-[9px] font-bold rounded-lg transition ${prv.enabled
                                 ? 'border-red-500/25 text-red-400 hover:bg-red-500/10'
                                 : 'border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/10'
-                            }`}
+                              }`}
                           >
                             {prv.enabled ? 'Disable Provider' : 'Enable'}
                           </button>
@@ -913,13 +959,11 @@ export default function AdminSettings() {
                           setIsDirty(true);
                           setMaintenanceConfig(prev => ({ ...prev, enabled: !prev.enabled }));
                         }}
-                        className={`w-12 h-6 rounded-full p-0.5 transition-colors ${
-                          maintenanceConfig.enabled ? 'bg-red-600' : 'bg-zinc-700'
-                        }`}
+                        className={`w-12 h-6 rounded-full p-0.5 transition-colors ${maintenanceConfig.enabled ? 'bg-red-600' : 'bg-zinc-700'
+                          }`}
                       >
-                        <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                          maintenanceConfig.enabled ? 'translate-x-6' : 'translate-x-0'
-                        }`} />
+                        <div className={`w-5 h-5 rounded-full bg-white transition-transform ${maintenanceConfig.enabled ? 'translate-x-6' : 'translate-x-0'
+                          }`} />
                       </button>
                     </div>
 
@@ -1115,10 +1159,9 @@ export default function AdminSettings() {
                     <span className="font-bold text-text-white block">{item.title}</span>
                     <p className="text-[10px] text-text-muted leading-relaxed mt-0.5">{item.description}</p>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold shrink-0 ml-2 ${
-                    item.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                    'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  }`}>
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold shrink-0 ml-2 ${item.severity === 'Critical' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                      'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    }`}>
                     {item.severity}
                   </span>
                 </div>

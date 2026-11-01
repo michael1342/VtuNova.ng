@@ -1,3 +1,4 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/themeContext';
@@ -19,20 +20,21 @@ import {
   Cell
 } from 'recharts';
 import type { AlertItem, UserAccount, UserActivityEvent as ActivityEvent } from '../../interface/admin.interface';
+import {
+  activateUser,
+  adjustAdminUserWallet,
+  createAdminUser,
+  deleteAdminUser,
+  getAdminSuspendedCount,
+  getAdminUserCount,
+  getAdminNewUsersCount,
+  getAdminUsers,
+  suspendUser,
+  updateAdminUser,
+} from '../../api/admin';
+import { sendAdminNotification } from '../../api/adminNotifications';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-// ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
-const INITIAL_USERS: UserAccount[] = [
-  { id: 'USR-89021', firstName: 'Chidi', lastName: 'Benson', email: 'chidi.b@example.com', phone: '+234 803 445 7821', walletBalance: 150000, transactionsCount: 482, verificationStatus: 'Verified', status: 'Active', role: 'User', joinedDate: '2025-06-12', emailVerified: true, phoneVerified: true, identityVerified: true },
-  { id: 'USR-89022', firstName: 'Amara', lastName: 'Okafor', email: 'amara.o@example.com', phone: '+234 810 984 5673', walletBalance: 245000, transactionsCount: 395, verificationStatus: 'Verified', status: 'Active', role: 'Agent', joinedDate: '2025-09-18', emailVerified: true, phoneVerified: true, identityVerified: true },
-  { id: 'USR-89023', firstName: 'Tunde', lastName: 'Bakare', email: 'tunde.b@example.com', phone: '+234 802 984 5673', walletBalance: 4500, transactionsCount: 312, verificationStatus: 'Pending', status: 'Active', role: 'User', joinedDate: '2025-11-04', emailVerified: true, phoneVerified: true, identityVerified: false, identityDocUrl: 'ID_Document_Tunde.pdf' },
-  { id: 'USR-89024', firstName: 'Fatima', lastName: 'Musa', email: 'fatima.m@example.com', phone: '+234 903 234 5678', walletBalance: 87000, transactionsCount: 288, verificationStatus: 'Verified', status: 'Active', role: 'User', joinedDate: '2025-12-15', emailVerified: true, phoneVerified: true, identityVerified: true },
-  { id: 'USR-89025', firstName: 'Obinna', lastName: 'Ani', email: 'obinna.a@example.com', phone: '+234 705 270 5119', walletBalance: 12000, transactionsCount: 95, verificationStatus: 'Unverified', status: 'Suspended', role: 'User', joinedDate: '2026-02-10', emailVerified: true, phoneVerified: false, identityVerified: false },
-  { id: 'USR-89026', firstName: 'Aisha', lastName: 'Yusuf', email: 'aisha.y@example.com', phone: '+234 803 112 3456', walletBalance: 320000, transactionsCount: 512, verificationStatus: 'Verified', status: 'Active', role: 'Agent', joinedDate: '2026-03-01', emailVerified: true, phoneVerified: true, identityVerified: true },
-  { id: 'USR-89027', firstName: 'David', lastName: 'Mark', email: 'david.m@example.com', phone: '+234 812 345 6789', walletBalance: 0, transactionsCount: 12, verificationStatus: 'Pending', status: 'Active', role: 'User', joinedDate: '2026-05-20', emailVerified: true, phoneVerified: false, identityVerified: false, identityDocUrl: 'NIN_Slip_David.jpg' },
-  { id: 'USR-89028', firstName: 'Grace', lastName: 'Emmanuel', email: 'grace.e@example.com', phone: '+234 905 678 1234', walletBalance: 95000, transactionsCount: 145, verificationStatus: 'Verified', status: 'Active', role: 'User', joinedDate: '2026-06-01', emailVerified: true, phoneVerified: true, identityVerified: true },
-];
-
 const INITIAL_TIMELINE_EVENTS: ActivityEvent[] = [
   { id: 'e1', userId: 'USR-89021', type: 'registration', text: 'User registered via landing referral link.', time: '2026-06-20 09:12', icon: '👤', color: 'bg-blue-500/10 text-blue-500' },
   { id: 'e2', userId: 'USR-89021', type: 'funding', text: 'Funded wallet with ₦50,000 using Paystack Checkout.', time: '2026-06-20 10:45', icon: '💳', color: 'bg-emerald-500/10 text-emerald-500' },
@@ -80,17 +82,17 @@ export default function AdminUserManagement() {
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
   // Users Lists & Simulation States
-  const [users, setUsers] = useState<UserAccount[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<UserAccount[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<ActivityEvent[]>(INITIAL_TIMELINE_EVENTS);
   const [alerts, setAlerts] = useState<AlertItem[]>(INITIAL_ALERTS);
 
   // KPI Counters (Dynamic values that change on operations)
-  const [totalUsers, setTotalUsers] = useState(12840);
-  const [activeUsers, setActiveUsers] = useState(9845);
-  const [newUsers, setNewUsers] = useState(1240);
-  const [suspendedUsers, setSuspendedUsers] = useState(104);
-  const [verifiedUsers, setVerifiedUsers] = useState(10952);
-  const [avgWalletVal] = useState(84500);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [newUsers, setNewUsers] = useState(0);
+  const [suspendedUsers, setSuspendedUsers] = useState(0);
+  const [verifiedUsers, setVerifiedUsers] = useState(0);
+  const [avgWalletVal] = useState(0);
 
   // Search & Filters toolbar
   const [searchQuery, setSearchQuery] = useState('');
@@ -120,6 +122,22 @@ export default function AdminUserManagement() {
     notificationTitle: '',
     notificationBody: '',
   });
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([getAdminUsers(), getAdminUserCount(), getAdminSuspendedCount()])
+      .then(([data, totalUsers, suspendedUsers]) => {
+        if (!active) return;
+        if (Array.isArray(data)) setUsers(data);
+        setTotalUsers(totalUsers);
+        setActiveUsers(Math.max(totalUsers - suspendedUsers, 0));
+        setSuspendedUsers(suspendedUsers);
+      })
+      .catch((error) => console.error('Failed to load admin users:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // ─── FILTER & SEARCH LOGIC ─────────────────────────────────────────────────
   const processedUsers = useMemo(() => {
@@ -160,27 +178,31 @@ export default function AdminUserManagement() {
     return result;
   }, [users, searchQuery, statusFilter, verifyFilter, roleFilter, balanceFilter, isEmptyState]);
 
+  useEffect(() => {
+    const fetchNewUsersCount = async () => {
+      setNewUsers(await getAdminNewUsersCount());
+    }
+    fetchNewUsersCount().catch((error) => console.error('Failed to fetch new users count:', error));
+  }, []);
   // ─── ACTIONS HANDLERS ──────────────────────────────────────────────────────
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName || !formData.email) return;
 
-    const newUserObj: UserAccount = {
-      id: `USR-${Math.floor(89000 + Math.random() * 900)}`,
+    const payload = {
       firstName: formData.firstName,
-      lastName: formData.lastName || 'Doe',
+      lastName: formData.lastName,
       email: formData.email,
-      phone: formData.phone || '+234 800 000 0000',
-      walletBalance: 0,
-      transactionsCount: 0,
-      verificationStatus: 'Unverified',
-      status: 'Active',
+      phone: formData.phone,
       role: formData.role,
-      joinedDate: new Date().toISOString().split('T')[0],
-      emailVerified: true,
-      phoneVerified: false,
-      identityVerified: false,
     };
+    let newUserObj: UserAccount;
+    try {
+      newUserObj = await createAdminUser(payload);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to create user.');
+      return;
+    }
 
     setUsers((prev) => [newUserObj, ...prev]);
     setTotalUsers((prev) => prev + 1);
@@ -205,51 +227,45 @@ export default function AdminUserManagement() {
     alert('User registered successfully!');
   };
 
-  const handleWalletAdjust = (e: React.FormEvent) => {
+  const handleWalletAdjust = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     const amountNum = parseFloat(formData.walletAmount);
     if (isNaN(amountNum) || amountNum <= 0) return;
 
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === selectedUser.id) {
-          const nextBal =
-            formData.walletAction === 'credit'
-              ? u.walletBalance + amountNum
-              : Math.max(0, u.walletBalance - amountNum);
-          
-          // Update drawer preview state dynamically if open
-          if (selectedUser.id === u.id) {
-            setSelectedUser({ ...u, walletBalance: nextBal });
-          }
-          return { ...u, walletBalance: nextBal };
-        }
-        return u;
-      })
-    );
+    try {
+      await adjustAdminUserWallet(selectedUser.id, {
+        action: formData.walletAction,
+        amount: amountNum,
+        reason: formData.walletReason,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to adjust wallet.');
+      return;
+    }
 
-    // Add Audit logs
-    setTimelineEvents((prev) => [
-      {
-        id: `evt-${Date.now()}`,
-        userId: selectedUser.id,
-        type: 'funding',
-        text: `Admin adjusted wallet (${formData.walletAction === 'credit' ? 'Credited' : 'Debited'} ₦${amountNum.toLocaleString()}): ${formData.walletReason || 'Routine Admin correction'}.`,
-        time: 'Just now',
-        icon: '💳',
-        color: formData.walletAction === 'credit' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500',
-      },
-      ...prev,
-    ]);
-
-    alert(`Successfully applied balance correction to ${selectedUser.firstName}'s wallet.`);
+    alert('Adjustment submitted for review. Balance changes only after approval in Wallet Adjustments.');
     setActiveModal(null);
     setFormData((prev) => ({ ...prev, walletAmount: '', walletReason: '' }));
   };
 
-  const handleVerifyAction = (type: 'email' | 'phone' | 'identity', approve: boolean) => {
+  const handleVerifyAction = async (type: 'email' | 'phone' | 'identity', approve: boolean) => {
     if (!selectedUser) return;
+
+    const payload = type === 'email'
+      ? { emailVerified: approve }
+      : type === 'phone'
+        ? { phoneVerified: approve }
+        : {
+          identityVerified: approve,
+          verificationStatus: approve ? 'Verified' as const : 'Unverified' as const,
+        };
+    try {
+      await updateAdminUser(selectedUser.id, payload);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to update verification.');
+      return;
+    }
 
     setUsers((prev) =>
       prev.map((u) => {
@@ -285,18 +301,25 @@ export default function AdminUserManagement() {
     alert(`Verification update applied.`);
   };
 
-  const handleStatusChange = (userId: string, newStatus: 'Active' | 'Suspended') => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          if (selectedUser?.id === userId) {
-            setSelectedUser({ ...u, status: newStatus });
-          }
-          return { ...u, status: newStatus };
-        }
-        return u;
-      })
-    );
+  const handleStatusChange = async (userId: string, newStatus: UserAccount['status']) => {
+    const user = users.find((item) => item.id === userId);
+    if (!user || user.status === newStatus) return;
+
+    try {
+      if (newStatus === 'Suspended') {
+        await suspendUser(userId);
+      } else {
+        await activateUser(userId);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to update user status.');
+      return;
+    }
+
+    setUsers((prev) => prev.map((item) => item.id === userId ? { ...item, status: newStatus } : item));
+    if (selectedUser?.id === userId) {
+      setSelectedUser((prev) => prev ? { ...prev, status: newStatus } : prev);
+    }
 
     if (newStatus === 'Suspended') {
       setSuspendedUsers((prev) => prev + 1);
@@ -322,8 +345,15 @@ export default function AdminUserManagement() {
     alert(`User account marked as ${newStatus}.`);
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to permanently delete this user account? This action is irreversible.')) return;
+
+    try {
+      await deleteAdminUser(userId);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete user.');
+      return;
+    }
 
     setUsers((prev) => prev.filter((u) => u.id !== userId));
     setTotalUsers((prev) => Math.max(0, prev - 1));
@@ -335,11 +365,24 @@ export default function AdminUserManagement() {
     alert('User profile permanently deleted from VtuNova core DB.');
   };
 
-  const handleSendUserNotification = (e: React.FormEvent) => {
+  const handleSendUserNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser || !formData.notificationTitle) return;
 
-    alert(`Direct notification broadcasted to user device: ${formData.notificationTitle}`);
+    try {
+      const payload = {
+        userId: selectedUser.id,
+        title: formData.notificationTitle,
+        message: formData.notificationBody,
+        type: 'system'
+      }
+      await sendAdminNotification(payload);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to send notification.');
+      return;
+    }
+
+    alert(`Notification sent to ${selectedUser.firstName}: ${formData.notificationTitle}`);
     setActiveModal(null);
     setFormData((prev) => ({ ...prev, notificationTitle: '', notificationBody: '' }));
   };
@@ -355,539 +398,540 @@ export default function AdminUserManagement() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">
+      <AdminLoadMore items={users} load={getAdminUsers} onLoaded={setUsers} />
+
       {/* ─── SCROLLABLE PAGE WORKSPACE ─── */}
       <main className="flex-1 p-6 space-y-6 overflow-y-auto max-w-[1600px] mx-auto w-full">
 
-          {/* Page Header */}
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/20 rounded-2xl p-6">
-            <div>
-              <h2 className="text-text-white font-heading font-extrabold text-2xl tracking-tight">User Management</h2>
-              <p className="text-text-gray text-xs sm:text-sm mt-1 max-w-2xl">
-                Manage user accounts, monitor platform activity, and maintain operational control.
-              </p>
-            </div>
+        {/* Page Header */}
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-gradient-to-r from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/20 rounded-2xl p-6">
+          <div>
+            <h2 className="text-text-white font-heading font-extrabold text-2xl tracking-tight">User Management</h2>
+            <p className="text-text-gray text-xs sm:text-sm mt-1 max-w-2xl">
+              Manage user accounts, monitor platform activity, and maintain operational control.
+            </p>
+          </div>
 
-            {/* Badges */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 flex items-center gap-1.5 shadow-xs">
-                ✓ Secure Administration
-              </span>
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-cyan-500/10 border-cyan-500/20 text-cyan-400 flex items-center gap-1.5 shadow-xs">
-                ✓ User Monitoring
-              </span>
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-blue-500/10 border-blue-500/20 text-blue-400 flex items-center gap-1.5 shadow-xs">
-                ✓ Verification Controls
-              </span>
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-purple-500/10 border-purple-500/20 text-purple-400 flex items-center gap-1.5 shadow-xs">
-                ✓ Live Activity
-              </span>
+          {/* Badges */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 flex items-center gap-1.5 shadow-xs">
+              ✓ Secure Administration
+            </span>
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-cyan-500/10 border-cyan-500/20 text-cyan-400 flex items-center gap-1.5 shadow-xs">
+              ✓ User Monitoring
+            </span>
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-blue-500/10 border-blue-500/20 text-blue-400 flex items-center gap-1.5 shadow-xs">
+              ✓ Verification Controls
+            </span>
+            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-purple-500/10 border-purple-500/20 text-purple-400 flex items-center gap-1.5 shadow-xs">
+              ✓ Live Activity
+            </span>
+          </div>
+        </div>
+
+        {/* Sim Empty State Control Bar */}
+        <div className="flex items-center justify-between bg-bg-card border border-border rounded-xl p-4 shadow-xs">
+          <span className="text-xs text-text-white font-semibold flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            User management operational database ready.
+          </span>
+          <button
+            onClick={() => setIsEmptyState(!isEmptyState)}
+            className="text-xs bg-bg-dark-secondary border border-border hover:bg-bg-card-hover text-text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            {isEmptyState ? 'Simulate Database Content' : 'Simulate Empty Search Results'}
+          </button>
+        </div>
+
+        {/* ─── OVERVIEW KPI CARDS SECTION (6 CARDS) ─── */}
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">Total Users</span>
+              <span className="text-[15px]">👥</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : totalUsers.toLocaleString()}</p>
+              <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">↑ +14.2% overall</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Sim Empty State Control Bar */}
-          <div className="flex items-center justify-between bg-bg-card border border-border rounded-xl p-4 shadow-xs">
-            <span className="text-xs text-text-white font-semibold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              User management operational database ready.
-            </span>
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">Active Users</span>
+              <span className="text-[15px]">🟢</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : activeUsers.toLocaleString()}</p>
+              <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">76.6% active rate</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">New Users</span>
+              <span className="text-[15px]">✨</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : newUsers.toLocaleString()}</p>
+              <span className="text-[9px] text-cyan-400 font-semibold block mt-0.5">↑ +18% this week</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">Suspended</span>
+              <span className="text-[15px]">🚫</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-red-400">{isEmptyState ? '0' : suspendedUsers.toLocaleString()}</p>
+              <span className="text-[9px] text-text-muted block mt-0.5">0.8% of user database</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">Verified</span>
+              <span className="text-[15px]">✓</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : verifiedUsers.toLocaleString()}</p>
+              <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">85.3% Level 2 KYC</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+            <div className="flex items-center justify-between text-text-muted">
+              <span className="text-xs font-medium">Average Wallet</span>
+              <span className="text-[15px]">₦</span>
+            </div>
+            <div className="my-2.5">
+              <p className="text-xl font-heading font-extrabold text-text-white">₦{isEmptyState ? '0' : avgWalletVal.toLocaleString()}</p>
+              <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">↑ +4.7% change</span>
+            </div>
+            <div className="h-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparklineData}>
+                  <Line type="monotone" dataKey="value" stroke="#a855f7" strokeWidth={1} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ─── ADMIN CONTROLS TOOLBAR ─── */}
+        <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-xs space-y-4">
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
+
+            {/* Search */}
+            <div className="flex-1 relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs">🔍</span>
+              <input
+                type="text"
+                placeholder="Search user name, email, phone number, ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full text-xs pl-9 pr-4 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden focus:border-blue-500 placeholder-text-muted transition-colors"
+              />
+            </div>
+
+            {/* Filters */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e: any) => setStatusFilter(e.target.value)}
+                className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
+              >
+                <option value="All">All Statuses</option>
+                <option value="Active">Active Only</option>
+                <option value="Suspended">Suspended Only</option>
+              </select>
+
+              <select
+                value={verifyFilter}
+                onChange={(e: any) => setVerifyFilter(e.target.value)}
+                className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
+              >
+                <option value="All">All Verification</option>
+                <option value="Verified">Verified</option>
+                <option value="Pending">Pending Audit</option>
+                <option value="Unverified">Unverified</option>
+              </select>
+
+              <select
+                value={roleFilter}
+                onChange={(e: any) => setRoleFilter(e.target.value)}
+                className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
+              >
+                <option value="All">All Roles</option>
+                <option value="User">User</option>
+                <option value="Agent">Agent</option>
+                <option value="Admin">Admin</option>
+              </select>
+
+              <select
+                value={balanceFilter}
+                onChange={(e: any) => setBalanceFilter(e.target.value)}
+                className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
+              >
+                <option value="All">All Balances</option>
+                <option value="Zero">Zero Wallet (₦0)</option>
+                <option value="High">High Balance (₦100k+)</option>
+              </select>
+            </div>
+
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setStatusFilter('All');
+                  setVerifyFilter('All');
+                  setRoleFilter('All');
+                  setBalanceFilter('All');
+                }}
+                className="text-xs text-text-muted hover:text-text-white font-semibold transition-colors bg-bg-dark-secondary px-3.5 py-2 rounded-xl border border-border"
+              >
+                Reset Filters
+              </button>
+              <button
+                onClick={() => alert('Exporting user roster to VtuNova_Roster_Audit.csv... File downloaded.')}
+                className="text-xs text-text-white hover:bg-bg-dark-secondary font-semibold transition-colors px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5"
+              >
+                <span>📥</span> CSV
+              </button>
+              <button
+                onClick={() => alert('Generating user roster audit statement PDF... Ready for printing.')}
+                className="text-xs text-text-white hover:bg-bg-dark-secondary font-semibold transition-colors px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5"
+              >
+                <span>📄</span> PDF
+              </button>
+            </div>
+
             <button
-              onClick={() => setIsEmptyState(!isEmptyState)}
-              className="text-xs bg-bg-dark-secondary border border-border hover:bg-bg-card-hover text-text-white px-3 py-1.5 rounded-lg transition-colors"
+              onClick={() => setActiveModal('addUser')}
+              className="text-xs text-white bg-blue-600 hover:bg-blue-500 font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-blue-600/10 flex items-center gap-1.5"
             >
-              {isEmptyState ? 'Simulate Database Content' : 'Simulate Empty Search Results'}
+              <span>➕</span> Add User Profile
             </button>
           </div>
+        </div>
 
-          {/* ─── OVERVIEW KPI CARDS SECTION (6 CARDS) ─── */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-            
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">Total Users</span>
-                <span className="text-[15px]">👥</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : totalUsers.toLocaleString()}</p>
-                <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">↑ +14.2% overall</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">Active Users</span>
-                <span className="text-[15px]">🟢</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : activeUsers.toLocaleString()}</p>
-                <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">76.6% active rate</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">New Users</span>
-                <span className="text-[15px]">✨</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : newUsers.toLocaleString()}</p>
-                <span className="text-[9px] text-cyan-400 font-semibold block mt-0.5">↑ +18% this week</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">Suspended</span>
-                <span className="text-[15px]">🚫</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-red-400">{isEmptyState ? '0' : suspendedUsers.toLocaleString()}</p>
-                <span className="text-[9px] text-text-muted block mt-0.5">0.8% of user database</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">Verified</span>
-                <span className="text-[15px]">✓</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-text-white">{isEmptyState ? '0' : verifiedUsers.toLocaleString()}</p>
-                <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">85.3% Level 2 KYC</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between shadow-xs hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-              <div className="flex items-center justify-between text-text-muted">
-                <span className="text-xs font-medium">Average Wallet</span>
-                <span className="text-[15px]">₦</span>
-              </div>
-              <div className="my-2.5">
-                <p className="text-xl font-heading font-extrabold text-text-white">₦{isEmptyState ? '0' : avgWalletVal.toLocaleString()}</p>
-                <span className="text-[9px] text-emerald-400 font-semibold block mt-0.5">↑ +4.7% change</span>
-              </div>
-              <div className="h-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={sparklineData}>
-                    <Line type="monotone" dataKey="value" stroke="#a855f7" strokeWidth={1} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
+        {/* ─── MAIN USER WORKSPACE LAYOUT ─── */}
+        {isEmptyState || processedUsers.length === 0 ? (
+          <div className="bg-bg-card border border-border rounded-2xl p-16 flex flex-col items-center justify-center text-center shadow-xs">
+            <span className="text-4xl mb-4">🔍</span>
+            <h3 className="text-text-white font-heading font-bold text-lg">No Users Found</h3>
+            <p className="text-text-muted text-xs sm:text-sm mt-1 max-w-sm">
+              No VtuNova customer profiles match the current filter criteria. Modify searches or register a profile.
+            </p>
+            <button
+              onClick={() => { setIsEmptyState(false); setSearchQuery(''); setStatusFilter('All'); setVerifyFilter('All'); setRoleFilter('All'); setBalanceFilter('All'); }}
+              className="mt-5 text-xs text-white bg-blue-600 hover:bg-blue-500 font-semibold px-4 py-2.5 rounded-xl transition-colors"
+            >
+              Reset Database Search
+            </button>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-          {/* ─── ADMIN CONTROLS TOOLBAR ─── */}
-          <div className="bg-bg-card border border-border rounded-2xl p-4 shadow-xs space-y-4">
-            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3">
-              
-              {/* Search */}
-              <div className="flex-1 relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs">🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search user name, email, phone number, ID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full text-xs pl-9 pr-4 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden focus:border-blue-500 placeholder-text-muted transition-colors"
-                />
-              </div>
+            {/* LEFT & CENTER: DATA TABLE */}
+            <div className="xl:col-span-2 space-y-6">
 
-              {/* Filters */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex items-center gap-2">
-                <select
-                  value={statusFilter}
-                  onChange={(e: any) => setStatusFilter(e.target.value)}
-                  className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
-                >
-                  <option value="All">All Statuses</option>
-                  <option value="Active">Active Only</option>
-                  <option value="Suspended">Suspended Only</option>
-                </select>
+              <div className="bg-bg-card border border-border rounded-2xl p-6 shadow-xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-text-muted font-semibold pb-3">
+                        {['User Account', 'Customer ID', 'Wallet Balance', 'Transactions', 'Email Verified', 'Status', 'Joined Date', 'Actions'].map((h) => (
+                          <th key={h} className="text-left py-3 pr-4 last:pr-0 whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {processedUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-bg-dark-secondary/50 transition-colors group">
 
-                <select
-                  value={verifyFilter}
-                  onChange={(e: any) => setVerifyFilter(e.target.value)}
-                  className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
-                >
-                  <option value="All">All Verification</option>
-                  <option value="Verified">Verified</option>
-                  <option value="Pending">Pending Audit</option>
-                  <option value="Unverified">Unverified</option>
-                </select>
-
-                <select
-                  value={roleFilter}
-                  onChange={(e: any) => setRoleFilter(e.target.value)}
-                  className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
-                >
-                  <option value="All">All Roles</option>
-                  <option value="User">User</option>
-                  <option value="Agent">Agent</option>
-                  <option value="Admin">Admin</option>
-                </select>
-
-                <select
-                  value={balanceFilter}
-                  onChange={(e: any) => setBalanceFilter(e.target.value)}
-                  className="text-xs px-3 py-2.5 border border-border rounded-xl bg-bg-dark-secondary text-text-white focus:outline-hidden"
-                >
-                  <option value="All">All Balances</option>
-                  <option value="Zero">Zero Wallet (₦0)</option>
-                  <option value="High">High Balance (₦100k+)</option>
-                </select>
-              </div>
-
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/60">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setSearchQuery('');
-                    setStatusFilter('All');
-                    setVerifyFilter('All');
-                    setRoleFilter('All');
-                    setBalanceFilter('All');
-                  }}
-                  className="text-xs text-text-muted hover:text-text-white font-semibold transition-colors bg-bg-dark-secondary px-3.5 py-2 rounded-xl border border-border"
-                >
-                  Reset Filters
-                </button>
-                <button
-                  onClick={() => alert('Exporting user roster to VtuNova_Roster_Audit.csv... File downloaded.')}
-                  className="text-xs text-text-white hover:bg-bg-dark-secondary font-semibold transition-colors px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5"
-                >
-                  <span>📥</span> CSV
-                </button>
-                <button
-                  onClick={() => alert('Generating user roster audit statement PDF... Ready for printing.')}
-                  className="text-xs text-text-white hover:bg-bg-dark-secondary font-semibold transition-colors px-3.5 py-2 rounded-xl border border-border flex items-center gap-1.5"
-                >
-                  <span>📄</span> PDF
-                </button>
-              </div>
-
-              <button
-                onClick={() => setActiveModal('addUser')}
-                className="text-xs text-white bg-blue-600 hover:bg-blue-500 font-semibold px-4 py-2.5 rounded-xl transition-all shadow-md shadow-blue-600/10 flex items-center gap-1.5"
-              >
-                <span>➕</span> Add User Profile
-              </button>
-            </div>
-          </div>
-
-          {/* ─── MAIN USER WORKSPACE LAYOUT ─── */}
-          {isEmptyState || processedUsers.length === 0 ? (
-            <div className="bg-bg-card border border-border rounded-2xl p-16 flex flex-col items-center justify-center text-center shadow-xs">
-              <span className="text-4xl mb-4">🔍</span>
-              <h3 className="text-text-white font-heading font-bold text-lg">No Users Found</h3>
-              <p className="text-text-muted text-xs sm:text-sm mt-1 max-w-sm">
-                No VtuNova customer profiles match the current filter criteria. Modify searches or register a profile.
-              </p>
-              <button
-                onClick={() => { setIsEmptyState(false); setSearchQuery(''); setStatusFilter('All'); setVerifyFilter('All'); setRoleFilter('All'); setBalanceFilter('All'); }}
-                className="mt-5 text-xs text-white bg-blue-600 hover:bg-blue-500 font-semibold px-4 py-2.5 rounded-xl transition-colors"
-              >
-                Reset Database Search
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-              {/* LEFT & CENTER: DATA TABLE */}
-              <div className="xl:col-span-2 space-y-6">
-                
-                <div className="bg-bg-card border border-border rounded-2xl p-6 shadow-xs">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border text-text-muted font-semibold pb-3">
-                          {['User Account', 'Customer ID', 'Wallet Balance', 'Transactions', 'Verification', 'Status', 'Joined Date', 'Actions'].map((h) => (
-                            <th key={h} className="text-left py-3 pr-4 last:pr-0 whitespace-nowrap">
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {processedUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-bg-dark-secondary/50 transition-colors group">
-                            
-                            {/* Avatar & User Details */}
-                            <td className="py-3.5 pr-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-heading font-bold uppercase shrink-0">
-                                  {u.firstName[0]}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-text-white font-semibold truncate hover:text-blue-500 transition-colors cursor-pointer" onClick={() => { setSelectedUser(u); setIsDrawerOpen(true); }}>
-                                    {u.firstName} {u.lastName}
-                                  </p>
-                                  <span className="text-[10px] text-text-muted block truncate">{u.email}</span>
-                                </div>
+                          {/* Avatar & User Details */}
+                          <td className="py-3.5 pr-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-heading font-bold uppercase shrink-0">
+                                {u.firstName[0]}
                               </div>
-                            </td>
+                              <div className="min-w-0">
+                                <p className="text-text-white font-semibold truncate hover:text-blue-500 transition-colors cursor-pointer" onClick={() => { setSelectedUser(u); setIsDrawerOpen(true); }}>
+                                  {u.firstName} {u.lastName}
+                                </p>
+                                <span className="text-[10px] text-text-muted block truncate">{u.email}</span>
+                              </div>
+                            </div>
+                          </td>
 
-                            {/* ID */}
-                            <td className="py-3.5 pr-4 text-blue-500 font-mono font-medium">{u.id}</td>
+                          {/* ID */}
+                          <td className="py-3.5 pr-4 text-blue-500 font-mono font-medium">{u.id}</td>
 
-                            {/* Balance */}
-                            <td className="py-3.5 pr-4 text-text-white font-bold">₦{u.walletBalance.toLocaleString()}</td>
+                          {/* Balance */}
+                          <td className="py-3.5 pr-4 text-text-white font-bold">₦{u.walletBalance.toLocaleString()}</td>
 
-                            {/* Count */}
-                            <td className="py-3.5 pr-4 text-text-muted font-mono">{u.transactionsCount} txs</td>
+                          {/* Count */}
+                          <td className="py-3.5 pr-4 text-text-muted font-mono">{u.transactionsCount} txs</td>
 
-                            {/* KYC */}
-                            <td className="py-3.5 pr-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border
-                                ${u.verificationStatus === 'Verified' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : ''}
-                                ${u.verificationStatus === 'Pending' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : ''}
-                                ${u.verificationStatus === 'Unverified' ? 'bg-red-500/10 border-red-500/20 text-red-400' : ''}
-                              `}>
-                                {u.verificationStatus}
-                              </span>
-                            </td>
+                          {/* Email Verified */}
+                          <td className="py-3.5 pr-4">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${u.emailVerified
+                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                              : 'bg-red-500/10 border-red-500/20 text-red-400'
+                              }`}>
+                              {u.emailVerified ? 'Verified' : 'Not verified'}
+                            </span>
+                          </td>
 
-                            {/* Status */}
-                            <td className="py-3.5 pr-4">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border
+                          {/* Status */}
+                          <td className="py-3.5 pr-4">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border
                                 ${u.status === 'Active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}
                               `}>
-                                {u.status}
-                              </span>
-                            </td>
+                              {u.status}
+                            </span>
+                          </td>
 
-                            {/* Date */}
-                            <td className="py-3.5 pr-4 text-text-muted">{u.joinedDate}</td>
+                          {/* Date */}
+                          <td className="py-3.5 pr-4 text-text-muted">{u.joinedDate}</td>
 
-                            {/* Actions Dropdown */}
-                            <td className="py-3.5 text-right relative">
-                              <button
-                                onClick={() => setActionsMenuUser(actionsMenuUser === u.id ? null : u.id)}
-                                className="px-2 py-1 bg-bg-dark-secondary border border-border text-text-white hover:bg-border transition-colors rounded-lg font-bold"
-                              >
-                                •••
-                              </button>
+                          {/* Actions Dropdown */}
+                          <td className="py-3.5 text-right relative">
+                            <button
+                              onClick={() => setActionsMenuUser(actionsMenuUser === u.id ? null : u.id)}
+                              className="px-2 py-1 bg-bg-dark-secondary border border-border text-text-white hover:bg-border transition-colors rounded-lg font-bold"
+                            >
+                              •••
+                            </button>
 
-                              {actionsMenuUser === u.id && (
-                                <div className="absolute right-0 mt-1 w-44 bg-bg-card border border-border rounded-xl shadow-xl py-2 z-30 text-left animate-in fade-in slide-in-from-top-2 duration-150">
-                                  <button onClick={() => { setSelectedUser(u); setIsDrawerOpen(true); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-text-white hover:bg-bg-card-hover transition-colors flex items-center gap-2">
-                                    👤 View Profile
+                            {actionsMenuUser === u.id && (
+                              <div className="absolute right-0 mt-1 w-44 bg-bg-card border border-border rounded-xl shadow-xl py-2 z-30 text-left animate-in fade-in slide-in-from-top-2 duration-150">
+                                <button onClick={() => { setSelectedUser(u); setIsDrawerOpen(true); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-text-white hover:bg-bg-card-hover transition-colors flex items-center gap-2">
+                                  👤 View Profile
+                                </button>
+                                <button onClick={() => { setSelectedUser(u); setActiveModal('walletAdjust'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-text-white hover:bg-bg-card-hover transition-colors flex items-center gap-2">
+                                  💰 Credit/Debit Wallet
+                                </button>
+                                {u.status === 'Active' ? (
+                                  <button onClick={() => { handleStatusChange(u.id, 'Suspended'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
+                                    🚫 Suspend User
                                   </button>
-                                  <button onClick={() => { setSelectedUser(u); setActiveModal('walletAdjust'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-text-white hover:bg-bg-card-hover transition-colors flex items-center gap-2">
-                                    💰 Credit/Debit Wallet
+                                ) : (
+                                  <button onClick={() => { handleStatusChange(u.id, 'Active'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2">
+                                    🟢 Reactivate
                                   </button>
-                                  {u.status === 'Active' ? (
-                                    <button onClick={() => { handleStatusChange(u.id, 'Suspended'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
-                                      🚫 Suspend User
-                                    </button>
-                                  ) : (
-                                    <button onClick={() => { handleStatusChange(u.id, 'Active'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2">
-                                      🟢 Reactivate
-                                    </button>
-                                  )}
-                                  <button onClick={() => { handleDeleteUser(u.id); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-500 hover:bg-red-600/10 transition-colors flex items-center gap-2">
-                                    🗑️ Delete Profile
-                                  </button>
-                                </div>
-                              )}
-                            </td>
+                                )}
+                                <button onClick={() => { handleDeleteUser(u.id); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-500 hover:bg-red-600/10 transition-colors flex items-center gap-2">
+                                  🗑️ Delete Profile
+                                </button>
+                              </div>
+                            )}
+                          </td>
 
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-
-                {/* Section B: Recharts Analytics Charts */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Chart 1: User Growth Timeline */}
-                  <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
-                    <h4 className="text-text-white font-heading font-bold text-sm mb-4">User Base Growth</h4>
-                    <div className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={ANALYTICS_GROWTH_DATA}>
-                          <defs>
-                            <linearGradient id="userGlow" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                          <XAxis dataKey="name" tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
-                          <YAxis tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
-                          <Tooltip />
-                          <Area type="monotone" dataKey="Users" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#userGlow)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                  {/* Chart 2: Wallet Distribution */}
-                  <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
-                    <h4 className="text-text-white font-heading font-bold text-sm mb-4">Wallet Balance Distribution</h4>
-                    <div className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={ANALYTICS_DISTRIBUTION_DATA}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                          <XAxis dataKey="name" tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
-                          <YAxis tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
-                          <Tooltip />
-                          <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-
-                </div>
-
               </div>
 
-              {/* RIGHT SIDEBAR PANEL */}
-              <div className="space-y-6">
+              {/* Section B: Recharts Analytics Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                {/* Verification Progress Donut */}
-                <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                  <div>
-                    <h4 className="text-text-white font-heading font-bold text-sm">KYC Verification Summary</h4>
-                    <p className="text-[11px] text-text-muted mt-0.5">Status breakdown of user registers</p>
-                  </div>
-                  
-                  <div className="h-44 my-4 flex items-center justify-center">
+                {/* Chart 1: User Growth Timeline */}
+                <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
+                  <h4 className="text-text-white font-heading font-bold text-sm mb-4">User Base Growth</h4>
+                  <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={ANALYTICS_VERIFICATION_DATA}
-                          innerRadius={50}
-                          outerRadius={70}
-                          paddingAngle={4}
-                          dataKey="value"
-                        >
-                          {ANALYTICS_VERIFICATION_DATA.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
+                      <AreaChart data={ANALYTICS_GROWTH_DATA}>
+                        <defs>
+                          <linearGradient id="userGlow" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
+                        <YAxis tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
                         <Tooltip />
-                      </PieChart>
+                        <Area type="monotone" dataKey="Users" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#userGlow)" />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs mt-2 border-t border-border pt-4">
-                    <div>
-                      <p className="text-text-muted text-[10px]">Verified</p>
-                      <p className="text-sm font-bold text-text-white">10.9k</p>
-                    </div>
-                    <div>
-                      <p className="text-text-muted text-[10px]">Pending</p>
-                      <p className="text-sm font-bold text-amber-500">1.2k</p>
-                    </div>
-                    <div>
-                      <p className="text-text-muted text-[10px]">Unverified</p>
-                      <p className="text-sm font-bold text-red-500">648</p>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Alerts log panel */}
+                {/* Chart 2: Wallet Distribution */}
                 <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-text-white font-heading font-bold text-sm">Suspicious Users Audit Log</h4>
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
-                  </div>
-
-                  <div className="space-y-3">
-                    {alerts.map((al) => (
-                      <div key={al.id} className="bg-bg-dark-secondary/60 border border-border rounded-xl p-3.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-[10px] font-extrabold uppercase ${al.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`}>
-                            {al.severity === 'high' ? '🚨 High Alert' : '⚠️ Warning'}
-                          </span>
-                          <span className="text-[9px] text-text-muted">{al.time}</span>
-                        </div>
-                        <h5 className="text-xs font-semibold text-text-white mt-1.5">{al.title}</h5>
-                        <p className="text-[10px] text-text-muted mt-1 leading-relaxed">{al.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Activity Heatmap Grid simulator */}
-                <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
-                  <h4 className="text-text-white font-heading font-bold text-sm mb-2">Hourly Activity Heatmap</h4>
-                  <p className="text-[10px] text-text-muted mb-4">Peak server usage hours across local time zones.</p>
-                  
-                  <div className="grid grid-cols-6 gap-1.5">
-                    {Array.from({ length: 24 }).map((_, i) => {
-                      const intensities = ['bg-blue-500/10', 'bg-blue-500/30', 'bg-blue-500/60', 'bg-blue-600', 'bg-blue-700'];
-                      const heat = intensities[Math.floor(Math.random() * intensities.length)];
-                      return (
-                        <div
-                          key={i}
-                          className={`aspect-square rounded-sm ${heat} hover:scale-110 transition-transform cursor-pointer`}
-                          title={`Hour ${i}:00 - Average Operations`}
-                        />
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-between text-[9px] text-text-muted mt-3">
-                    <span>Low load (00:00)</span>
-                    <span>Peak Traffic (14:00)</span>
+                  <h4 className="text-text-white font-heading font-bold text-sm mb-4">Wallet Balance Distribution</h4>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={ANALYTICS_DISTRIBUTION_DATA}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                        <XAxis dataKey="name" tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
+                        <YAxis tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }} axisLine={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
 
               </div>
 
             </div>
-          )}
 
-        </main>
+            {/* RIGHT SIDEBAR PANEL */}
+            <div className="space-y-6">
+
+              {/* Verification Progress Donut */}
+              <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                  <h4 className="text-text-white font-heading font-bold text-sm">KYC Verification Summary</h4>
+                  <p className="text-[11px] text-text-muted mt-0.5">Status breakdown of user registers</p>
+                </div>
+
+                <div className="h-44 my-4 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={ANALYTICS_VERIFICATION_DATA}
+                        innerRadius={50}
+                        outerRadius={70}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {ANALYTICS_VERIFICATION_DATA.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs mt-2 border-t border-border pt-4">
+                  <div>
+                    <p className="text-text-muted text-[10px]">Verified</p>
+                    <p className="text-sm font-bold text-text-white">10.9k</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-[10px]">Pending</p>
+                    <p className="text-sm font-bold text-amber-500">1.2k</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-[10px]">Unverified</p>
+                    <p className="text-sm font-bold text-red-500">648</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Alerts log panel */}
+              <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-text-white font-heading font-bold text-sm">Suspicious Users Audit Log</h4>
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
+                </div>
+
+                <div className="space-y-3">
+                  {alerts.map((al) => (
+                    <div key={al.id} className="bg-bg-dark-secondary/60 border border-border rounded-xl p-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-extrabold uppercase ${al.severity === 'high' ? 'text-red-500' : 'text-amber-500'}`}>
+                          {al.severity === 'high' ? '🚨 High Alert' : '⚠️ Warning'}
+                        </span>
+                        <span className="text-[9px] text-text-muted">{al.time}</span>
+                      </div>
+                      <h5 className="text-xs font-semibold text-text-white mt-1.5">{al.title}</h5>
+                      <p className="text-[10px] text-text-muted mt-1 leading-relaxed">{al.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Activity Heatmap Grid simulator */}
+              <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-xs">
+                <h4 className="text-text-white font-heading font-bold text-sm mb-2">Hourly Activity Heatmap</h4>
+                <p className="text-[10px] text-text-muted mb-4">Peak server usage hours across local time zones.</p>
+
+                <div className="grid grid-cols-6 gap-1.5">
+                  {Array.from({ length: 24 }).map((_, i) => {
+                    const intensities = ['bg-blue-500/10', 'bg-blue-500/30', 'bg-blue-500/60', 'bg-blue-600', 'bg-blue-700'];
+                    const heat = intensities[Math.floor(Math.random() * intensities.length)];
+                    return (
+                      <div
+                        key={i}
+                        className={`aspect-square rounded-sm ${heat} hover:scale-110 transition-transform cursor-pointer`}
+                        title={`Hour ${i}:00 - Average Operations`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-text-muted mt-3">
+                  <span>Low load (00:00)</span>
+                  <span>Peak Traffic (14:00)</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      </main>
 
       {/* ─── USER PROFILE SLIDE-OVER DRAWER ─── */}
       {isDrawerOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
           {/* Drawer backdrop closer */}
           <div onClick={() => setIsDrawerOpen(false)} className="flex-1" />
-          
+
           <div className="w-full max-w-lg bg-bg-card border-l border-border h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-            
+
             {/* Drawer Header */}
             <div className="p-6 border-b border-border flex items-center justify-between bg-bg-dark-secondary/40">
               <div className="flex items-center gap-3">
@@ -909,7 +953,7 @@ export default function AdminUserManagement() {
 
             {/* Scrollable details */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              
+
               {/* Profile Overview */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-text-white uppercase tracking-wider border-b border-border pb-1">Profile Details</h4>
@@ -925,6 +969,12 @@ export default function AdminUserManagement() {
                   <div>
                     <span className="text-text-muted block mb-0.5">Customer Tier</span>
                     <span className="text-text-white font-semibold text-blue-500">{selectedUser.role}</span>
+                  </div>
+                  <div>
+                    <span className="text-text-muted block mb-0.5">Current Status</span>
+                    <span className={selectedUser.status === 'Active' ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                      {selectedUser.status}
+                    </span>
                   </div>
                   <div>
                     <span className="text-text-muted block mb-0.5">Joined System</span>
@@ -950,9 +1000,9 @@ export default function AdminUserManagement() {
               {/* Verification Status */}
               <div className="space-y-4">
                 <h4 className="text-xs font-bold text-text-white uppercase tracking-wider border-b border-border pb-1">Verification Center</h4>
-                
+
                 <div className="space-y-3.5">
-                  
+
                   {/* Email */}
                   <div className="flex items-center justify-between border border-border/80 p-3 rounded-xl">
                     <div className="flex items-center gap-2">
@@ -1058,7 +1108,7 @@ export default function AdminUserManagement() {
               >
                 Send notification
               </button>
-              
+
               {selectedUser.status === 'Active' ? (
                 <button
                   onClick={() => handleStatusChange(selectedUser.id, 'Suspended')}
@@ -1088,7 +1138,7 @@ export default function AdminUserManagement() {
           <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-text-muted hover:text-text-white text-lg">✕</button>
             <h3 className="text-text-white font-heading font-bold text-base mb-4">Register User Profile</h3>
-            
+
             <form onSubmit={handleAddUser} className="space-y-4 text-xs">
               <div>
                 <label className="block font-semibold text-text-muted uppercase mb-1.5">First Name</label>
@@ -1176,7 +1226,7 @@ export default function AdminUserManagement() {
                   <option value="debit">Debit Balance (Deduct Funds)</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block font-semibold text-text-muted uppercase mb-1.5">Correction Amount (₦)</label>
                 <input

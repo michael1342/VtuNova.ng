@@ -29,7 +29,7 @@ export const getTransactions = async (): Promise<GetTransactionsResponse | any> 
 export const saveBenficiary = async ({ data }: Beneficiary): Promise<any> => {
     try {
         const response = await http.post("/users/save-beneficiary", { ...data });
-        return response as unknown as TransactionChartResponse;
+        return response;
     } catch (err) {
         if (err instanceof ApiError) {
             return { success: false, error: err.message, response: [] };
@@ -44,7 +44,7 @@ export const editBenficiary = async ({ data }: Beneficiary): Promise<any> => {
         // console.log(data)
         const response = await http.patch(`/users/edit-beneficiary/${data._id}`, { ...data });
         console.log(response)
-        return response as unknown as GenerateReceiptResponse;
+        return response;
     } catch (err) {
         if (err instanceof ApiError) {
             console.log(err.message)
@@ -54,9 +54,18 @@ export const editBenficiary = async ({ data }: Beneficiary): Promise<any> => {
     }
 }
 
-export const getBenficiary = async (): Promise<any> => {
+interface BeneficiaryListResponse {
+    beneficiary?: unknown[];
+    data?: { beneficiary?: unknown[] };
+}
+
+export const getBenficiary = async (): Promise<
+    | { success: true; data: BeneficiaryListResponse }
+    | { success: false; error: string; data: never[] }
+    | undefined
+> => {
     try {
-        const response = await http.get("/users/get-beneficiaries");
+        const response = await http.get("/users/get-beneficiaries") as unknown as BeneficiaryListResponse;
         return { data: response, success: true };
     } catch (err) {
         if (err instanceof ApiError) {
@@ -65,9 +74,17 @@ export const getBenficiary = async (): Promise<any> => {
     }
 }
 
-export const deleteBeneficiary = async (id: string): Promise<any> => {
+export const deleteBeneficiary = async (id: string): Promise<
+    | { success?: boolean; error?: string; [key: string]: unknown }
+    | { success: false; error: string }
+    | undefined
+> => {
     try {
-        const response = await http.delete(`/users/delete-beneficiary/${id}`);
+        const response = await http.delete(`/users/delete-beneficiary/${id}`) as unknown as {
+            success?: boolean;
+            error?: string;
+            [key: string]: unknown;
+        };
         return response;
     } catch (err) {
         if (err instanceof ApiError) {
@@ -79,7 +96,6 @@ export const deleteBeneficiary = async (id: string): Promise<any> => {
 export const uploadProfilePic = async (formData: any) => {
     try {
         const response = await http.patch("/users/upload-profile-pic", formData, { headers: { "Content-Type": "multipart/form-data" } });
-        console.log(response)
         return response;
     } catch (err) {
         if (err instanceof ApiError) {

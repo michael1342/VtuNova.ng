@@ -24,6 +24,19 @@ export function AuthProvider({ children }: ProviderProps) {
   // );
   const calculated = currentUser?.wallet?.balance - currentUser?.wallet?.reserved
   const accountBalance = calculated
+  const setAccountBalance = (balance: number | null) => {
+    if (balance === null) return;
+    setCurrentUser((user: any) => {
+      if (!user || !user.wallet || typeof user.wallet !== 'object') return user;
+      return {
+        ...user,
+        wallet: {
+          ...user.wallet,
+          balance: balance + (user.wallet.reserved || 0),
+        },
+      };
+    });
+  };
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
   const setOtpId = useAuthStore((state) => state.setOtpId);
@@ -116,7 +129,7 @@ console.log(response)
   // ── Mock Transactions ────────────────────────────────────────────────────────
   
   return (
-  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, response: currentUser, user: currentUser}}>
+  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, setAccountBalance, response: currentUser, user: currentUser}}>
     {children}
   </AuthContext.Provider>
   )

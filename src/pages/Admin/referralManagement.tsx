@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
   Area,
@@ -21,6 +21,20 @@ import {
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import type { Campaign, FraudRecord, LeaderboardUser, Payout, Referral, ReferralActivityLog as ActivityLog, RewardConfig } from '../../interface/admin.interface';
+import {
+  createAdminReferralCampaign,
+  getAdminReferralCampaigns,
+  getAdminReferralFraudRecords,
+  getAdminReferralPayouts,
+  getAdminReferrals,
+  getAdminRewardConfig,
+  payAdminReferralPayout,
+  updateAdminFraudRecord,
+  updateAdminReferral,
+  updateAdminReferralCampaign,
+  updateAdminReferralPayout,
+  updateAdminRewardConfig,
+} from '../../api/adminReferrals';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -283,6 +297,29 @@ export default function AdminReferralManagement() {
 
   // New Campaign Form State
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      getAdminReferrals(),
+      getAdminReferralCampaigns(),
+      getAdminReferralPayouts(),
+      getAdminReferralFraudRecords(),
+      getAdminRewardConfig(),
+    ])
+      .then(([referralData, campaignData, payoutData, fraudData, rewardData]) => {
+        if (!active) return;
+        setReferrals(referralData);
+        setCampaigns(campaignData);
+        setPayouts(payoutData);
+        setFraudRecords(fraudData);
+        if (rewardData) setRewardConfig(rewardData);
+      })
+      .catch((error) => console.error('Failed to load referral data:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignBudget, setNewCampaignBudget] = useState('');
   const [newCampaignDesc, setNewCampaignDesc] = useState('');
@@ -294,20 +331,27 @@ export default function AdminReferralManagement() {
   };
 
   // Handlers for Referral Actions
-  const handlePauseReferral = (id: string) => {
+  const handlePauseReferral = async (id: string) => {
+    const matched = referrals.find(r => r.id === id);
+    if (!matched) return;
+    const nextStatus = matched.status === 'Suspended' ? 'Active' : 'Suspended';
+    try {
+      await updateAdminReferral(id, { status: nextStatus });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to update referral status.');
+      return;
+    }
     setReferrals(prev =>
       prev.map(ref => {
         if (ref.id === id) {
-          const nextStatus = ref.status === 'Suspended' ? 'Active' : 'Suspended';
           return { ...ref, status: nextStatus };
         }
         return ref;
       })
     );
-    const matched = referrals.find(r => r.id === id);
     const action = matched?.status === 'Suspended' ? 'activated' : 'suspended';
     triggerToast(`Referral account for ${matched?.name} has been ${action}.`);
-    
+
     // Add log
     const newLog: ActivityLog = {
       id: `ACT-${Math.floor(100 + Math.random() * 900)}`,
@@ -319,7 +363,15 @@ export default function AdminReferralManagement() {
     setActivityLogs(prev => [newLog, ...prev]);
   };
 
-  const handleAdjustReward = (id: string, amount: number) => {
+  const handleAdjustReward = async (id: string, amount: number) => {
+    const referral = referrals.find(ref => ref.id === id);
+    if (!referral) return;
+    try {
+      await updateAdminReferral(id, { earnings: referral.earnings + amount });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to adjust referral reward.');
+      return;
+    }
     setReferrals(prev =>
       prev.map(ref => {
         if (ref.id === id) {
@@ -332,25 +384,37 @@ export default function AdminReferralManagement() {
   };
 
   // Handlers for Payout Queue Actions
-  const handleApprovePayout = (id: string) => {
+  const handleApprovePayout = async (id: string) => {
+    try {
+      await updateAdminReferralPayout(id, 'Approved');
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to approve payout.');
+      return;
+    }
     setPayouts(prev =>
       prev.map(p => (p.id === id ? { ...p, status: 'Approved' as const } : p))
     );
     triggerToast(`Payout ${id} approved successfully.`);
   };
 
-  const handleRejectPayout = (id: string) => {
+  const handleRejectPayout = async (id: string) => {
+    try {
+      await updateAdminReferralPayout(id, 'Rejected');
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to reject payout.');
+      return;
+    }
     setPayouts(prev =>
       prev.map(p => (p.id === id ? { ...p, status: 'Rejected' as const } : p))
     );
     triggerToast(`Payout request ${id} rejected.`);
   };
 
-  const handlePayPayout = (id: string) => {
+  const handlePayPayout = async (id: string) => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await payAdminReferralPayout(id);
       setPayouts(prev => prev.filter(p => p.id !== id));
-      setLoading(false);
       triggerToast(`Dispatched reward payment to customer wallet.`);
 
       const newLog: ActivityLog = {
@@ -361,11 +425,21 @@ export default function AdminReferralManagement() {
         timestamp: 'Just now'
       };
       setActivityLogs(prev => [newLog, ...prev]);
-    }, 800);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to pay referral reward.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handlers for Fraud record actions
-  const handleUpdateFraudStatus = (id: string, nextStatus: FraudRecord['status']) => {
+  const handleUpdateFraudStatus = async (id: string, nextStatus: FraudRecord['status']) => {
+    try {
+      await updateAdminFraudRecord(id, nextStatus);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to update fraud record.');
+      return;
+    }
     setFraudRecords(prev =>
       prev.map(record => {
         if (record.id === id) {
@@ -378,22 +452,24 @@ export default function AdminReferralManagement() {
   };
 
   // Campaign create handler
-  const handleCreateCampaign = (e: React.FormEvent) => {
+  const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCampaignName || !newCampaignBudget) {
       triggerToast('Please complete campaign specifications.');
       return;
     }
-    const newCamp: Campaign = {
-      id: `CMP-0${campaigns.length + 1}`,
-      name: newCampaignName,
-      status: 'Active',
-      participants: 0,
-      budget: parseFloat(newCampaignBudget),
-      spent: 0,
-      conversionRate: 0,
-      description: newCampaignDesc
-    };
+    let newCamp: Campaign;
+    try {
+      newCamp = await createAdminReferralCampaign({
+        name: newCampaignName,
+        status: 'Active',
+        budget: parseFloat(newCampaignBudget),
+        description: newCampaignDesc
+      });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to create referral campaign.');
+      return;
+    }
     setCampaigns(prev => [...prev, newCamp]);
     setIsCampaignModalOpen(false);
     setNewCampaignName('');
@@ -411,18 +487,38 @@ export default function AdminReferralManagement() {
     setActivityLogs(prev => [newLog, ...prev]);
   };
 
+  const handleSaveRewardConfig = async () => {
+    try {
+      const savedConfig = await updateAdminRewardConfig(rewardConfig);
+      setRewardConfig(savedConfig);
+      triggerToast('Referral payout rules successfully committed.');
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to save reward rules.');
+    }
+  };
+
   // Reconcile and refresh database stats
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setReferrals(INITIAL_REFERRALS);
-      setCampaigns(INITIAL_CAMPAIGNS);
-      setPayouts(INITIAL_PAYOUTS);
-      setFraudRecords(FRAUD_RECORDS);
-      setActivityLogs(ACTIVITY_LOGS);
-      setLoading(false);
+    try {
+      const [referralData, campaignData, payoutData, fraudData, rewardData] = await Promise.all([
+        getAdminReferrals(),
+        getAdminReferralCampaigns(),
+        getAdminReferralPayouts(),
+        getAdminReferralFraudRecords(),
+        getAdminRewardConfig(),
+      ]);
+      setReferrals(referralData);
+      setCampaigns(campaignData);
+      setPayouts(payoutData);
+      setFraudRecords(fraudData);
+      setRewardConfig(rewardData);
       triggerToast('Referral databases reconciled.');
-    }, 700);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh referral data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Filters logic
@@ -566,7 +662,7 @@ export default function AdminReferralManagement() {
 
       {/* Main Page Layout */}
       <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
-        
+
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -929,9 +1025,8 @@ export default function AdminReferralManagement() {
                     return (
                       <tr
                         key={ref.id}
-                        className={`hover:bg-bg-card-hover/40 transition-colors ${
-                          isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
-                        }`}
+                        className={`hover:bg-bg-card-hover/40 transition-colors ${isSelected ? 'bg-primary/5 hover:bg-primary/10' : ''
+                          }`}
                       >
                         <td className="py-3.5 px-4">
                           <input
@@ -966,18 +1061,16 @@ export default function AdminReferralManagement() {
                           ₦{ref.earnings.toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
-                            ref.status === 'Rewarded' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                            ref.status === 'Active' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
-                            ref.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                            'bg-red-500/10 text-red-400 border border-red-500/20'
-                          }`}>
-                            <span className={`w-1 h-1 rounded-full ${
-                              ref.status === 'Rewarded' ? 'bg-emerald-400' :
-                              ref.status === 'Active' ? 'bg-blue-400' :
-                              ref.status === 'Pending' ? 'bg-amber-400' :
-                              'bg-red-400'
-                            }`} />
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${ref.status === 'Rewarded' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              ref.status === 'Active' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                ref.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  'bg-red-500/10 text-red-400 border border-red-500/20'
+                            }`}>
+                            <span className={`w-1 h-1 rounded-full ${ref.status === 'Rewarded' ? 'bg-emerald-400' :
+                                ref.status === 'Active' ? 'bg-blue-400' :
+                                  ref.status === 'Pending' ? 'bg-amber-400' :
+                                    'bg-red-400'
+                              }`} />
                             {ref.status}
                           </span>
                         </td>
@@ -999,11 +1092,10 @@ export default function AdminReferralManagement() {
                             </button>
                             <button
                               onClick={() => handlePauseReferral(ref.id)}
-                              className={`p-1 px-2 rounded-lg border text-[11px] font-semibold transition ${
-                                ref.status === 'Suspended'
+                              className={`p-1 px-2 rounded-lg border text-[11px] font-semibold transition ${ref.status === 'Suspended'
                                   ? 'border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10'
                                   : 'border-red-500/20 text-red-400 hover:bg-red-500/10'
-                              }`}
+                                }`}
                             >
                               {ref.status === 'Suspended' ? 'Activate' : 'Suspend'}
                             </button>
@@ -1052,11 +1144,10 @@ export default function AdminReferralManagement() {
                   <button
                     key={i}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`px-2.5 py-1 rounded ${
-                      currentPage === i + 1
+                    className={`px-2.5 py-1 rounded ${currentPage === i + 1
                         ? 'bg-primary text-white font-bold'
                         : 'bg-bg-card border border-border text-text-white hover:bg-bg-card-hover'
-                    }`}
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -1086,11 +1177,10 @@ export default function AdminReferralManagement() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[9px] text-text-muted uppercase tracking-wider">{camp.id}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      camp.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
-                      camp.status === 'Scheduled' ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-zinc-500/10 text-zinc-400'
-                    }`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${camp.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' :
+                        camp.status === 'Scheduled' ? 'bg-amber-500/10 text-amber-400' :
+                          'bg-zinc-500/10 text-zinc-400'
+                      }`}>
                       {camp.status}
                     </span>
                   </div>
@@ -1129,17 +1219,23 @@ export default function AdminReferralManagement() {
                       Config
                     </button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        const nextStatus = camp.status === 'Active' ? 'Paused' : 'Active';
+                        try {
+                          await updateAdminReferralCampaign(camp.id, nextStatus);
+                        } catch (error) {
+                          triggerToast(error instanceof Error ? error.message : 'Failed to update campaign status.');
+                          return;
+                        }
                         setCampaigns(prev =>
-                          prev.map(c => (c.id === camp.id ? { ...c, status: c.status === 'Active' ? 'Paused' as const : 'Active' as const } : c))
+                          prev.map(c => (c.id === camp.id ? { ...c, status: nextStatus } : c))
                         );
                         triggerToast(`Status changed for ${camp.name}.`);
                       }}
-                      className={`flex-1 py-1.5 border text-[9px] font-bold rounded-lg transition ${
-                        camp.status === 'Active'
+                      className={`flex-1 py-1.5 border text-[9px] font-bold rounded-lg transition ${camp.status === 'Active'
                           ? 'border-red-500/20 text-red-400 hover:bg-red-500/10'
                           : 'border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/10'
-                      }`}
+                        }`}
                     >
                       {camp.status === 'Active' ? 'Pause' : 'Activate'}
                     </button>
@@ -1263,7 +1359,7 @@ export default function AdminReferralManagement() {
                 Preview Rewards
               </button>
               <button
-                onClick={() => triggerToast('Referral payout rules successfully committed.')}
+                onClick={handleSaveRewardConfig}
                 className="flex-1 py-2 bg-primary hover:bg-primary-hover text-white text-[11px] font-bold rounded-xl shadow-xs transition"
               >
                 Save Rules
@@ -1366,11 +1462,10 @@ export default function AdminReferralManagement() {
                   <div key={fraud.id} className="bg-bg-dark-secondary/50 border border-border rounded-xl p-3.5 space-y-2.5 hover:border-red-500/30 transition">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-text-white block truncate text-[11px] max-w-[150px]">{fraud.type}</span>
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${
-                        fraud.riskLevel === 'Critical' ? 'bg-red-500/25 text-red-400 border border-red-500/30' :
-                        fraud.riskLevel === 'High' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                        'bg-blue-500/10 text-blue-400'
-                      }`}>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${fraud.riskLevel === 'Critical' ? 'bg-red-500/25 text-red-400 border border-red-500/30' :
+                          fraud.riskLevel === 'High' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                            'bg-blue-500/10 text-blue-400'
+                        }`}>
                         {fraud.riskLevel} Risk
                       </span>
                     </div>
@@ -1425,11 +1520,10 @@ export default function AdminReferralManagement() {
                 {LEADERBOARD.map(user => (
                   <div key={user.rank} className="flex items-center justify-between bg-bg-dark-secondary/35 border border-border rounded-xl p-2.5 hover:border-primary/20 transition">
                     <div className="flex items-center gap-3">
-                      <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center ${
-                        user.rank === 1 ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30' :
-                        user.rank === 2 ? 'bg-zinc-400/20 text-zinc-300' :
-                        'bg-zinc-700/20 text-text-muted'
-                      }`}>
+                      <span className={`w-5 h-5 rounded-full font-bold text-[10px] flex items-center justify-center ${user.rank === 1 ? 'bg-amber-400/20 text-amber-400 border border-amber-400/30' :
+                          user.rank === 2 ? 'bg-zinc-400/20 text-zinc-300' :
+                            'bg-zinc-700/20 text-text-muted'
+                        }`}>
                         {user.rank}
                       </span>
                       <div>
@@ -1454,10 +1548,9 @@ export default function AdminReferralManagement() {
             <div className="space-y-3.5 pl-1 text-xs max-h-64 overflow-y-auto pr-1">
               {activityLogs.map(log => (
                 <div key={log.id} className="flex items-start gap-3">
-                  <span className={`w-6 h-6 rounded bg-primary/10 border border-primary/15 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 ${
-                    log.event === 'Referral Suspended' ? 'text-red-400 bg-red-500/10 border-red-500/15' :
-                    log.event === 'Reward Issued' ? 'text-emerald-400 bg-emerald-500/10' : ''
-                  }`}>
+                  <span className={`w-6 h-6 rounded bg-primary/10 border border-primary/15 text-primary flex items-center justify-center font-bold text-[10px] shrink-0 ${log.event === 'Referral Suspended' ? 'text-red-400 bg-red-500/10 border-red-500/15' :
+                      log.event === 'Reward Issued' ? 'text-emerald-400 bg-emerald-500/10' : ''
+                    }`}>
                     {log.event === 'Referral Suspended' ? '✕' : '✓'}
                   </span>
                   <div className="flex-1">
@@ -1638,11 +1731,10 @@ export default function AdminReferralManagement() {
                   <div className="bg-bg-dark-secondary/60 border-t border-border px-6 py-5 flex items-center justify-between gap-3 shadow-2xl">
                     <button
                       onClick={() => handlePauseReferral(selectedReferral.id)}
-                      className={`flex-1 py-2.5 rounded-xl border text-xs font-bold text-center transition cursor-pointer ${
-                        selectedReferral.status === 'Suspended'
+                      className={`flex-1 py-2.5 rounded-xl border text-xs font-bold text-center transition cursor-pointer ${selectedReferral.status === 'Suspended'
                           ? 'border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/10'
                           : 'border-red-500/25 text-red-400 hover:bg-red-500/10'
-                      }`}
+                        }`}
                     >
                       {selectedReferral.status === 'Suspended' ? 'Activate Referral' : 'Pause Referral'}
                     </button>

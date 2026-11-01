@@ -18,6 +18,7 @@ import {
 import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
 import ApiError from '../api/ApiError';
+import { requestPasswordReset } from '../api/auth';
 
 
 // console.log(localStorage.getItem('vtuNova_key'))
@@ -36,6 +37,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [, setShowError] = useState(false)
   const [loading, setLoading] = useState(false);
+  const [requestingReset, setRequestingReset] = useState(false);
   const [animateShake, setAnimateShake] = useState(false);
   const [success, setSuccess] = useState('');
 
@@ -46,8 +48,8 @@ const Login = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   // const { login } = useAuth() as { login: (credentials: { email: string; password?: string }) => { success: boolean; error?: string ; user?: any } };
-  const { theme, toggleTheme } = useTheme() as {theme: string, toggleTheme: () => void};
-  const {login, currentUser} = useAuth()
+  const { theme, toggleTheme } = useTheme() as { theme: string, toggleTheme: () => void };
+  const { login, currentUser } = useAuth()
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -83,34 +85,55 @@ const Login = () => {
     await new Promise((r) => setTimeout(r, 600));
 
     try {
-       const res = await login({ email: form.email, password: form.password });
-    console.log(res)
-    setLoading(false);
-    // console.log(form.email, form.password)
+      const res = await login({ email: form.email, password: form.password });
+      console.log(res)
+      setLoading(false);
+      // console.log(form.email, form.password)
 
-    if (res && res.success) {
-      setSuccess('Access granted! Redirecting...');
-      const roleHome: /* Record<string, string> */any = {
-        user: '/user/dashboard',
-        admin: '/admin/dashboard',
+      if (res && res.success) {
+        setSuccess('Access granted! Redirecting...');
+        const roleHome: /* Record<string, string> */any = {
+          user: '/user/dashboard',
+          admin: '/admin/dashboard',
+        }
+        const role = res.response.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
+        const destination = roleHome[role] || params.get('from')
+        // console.log(res.user.role)
+        setTimeout(() => navigate(destination), 1200);
+      } else {
+        setLoading(false);
+        triggerError(res?.error || 'Invalid credentials. Please try again.');
+        setShowError(true)
+        return
       }
-      const role = res.response.user?.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || '';
-      const destination = roleHome[role] || params.get('from')
-      // console.log(res.user.role)
-      setTimeout(() => navigate(destination), 1200);
-    } else {
-       setLoading(false);
-      triggerError(res?.error || 'Invalid credentials. Please try again.');
-      setShowError(true)
-      return
-    }
     } catch (error) {
       console.error(error);
       setLoading(false);
-      if(error instanceof ApiError) return triggerError(error.message);
+      if (error instanceof ApiError) return triggerError(error.message);
 
     }
-   
+
+  };
+
+  const handleForgotPassword = async () => {
+    const email = form.email.trim();
+    if (!email) return triggerError('Enter your email address first.');
+    if (!/\S+@\S+\.\S+/.test(email)) return triggerError('Enter a valid email address.');
+
+    setError('');
+    setRequestingReset(true);
+    try {
+      const result = await requestPasswordReset({ email });
+      if (!result?.success) {
+        triggerError(result?.error || 'Unable to send a reset code. Please try again.');
+        return;
+      }
+      navigate('/verify-password-reset-otp', { state: { email, codeSent: true } });
+    } catch (resetError) {
+      triggerError(resetError instanceof ApiError ? resetError.message : 'Unable to send a reset code. Please try again.');
+    } finally {
+      setRequestingReset(false);
+    }
   };
 
   return (
@@ -284,9 +307,8 @@ const Login = () => {
           {/* Error Alert */}
           {error && (
             <div
-              className={`mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 ${
-                animateShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
-              }`}
+              className={`mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2 ${animateShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
+                }`}
             >
               <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -324,9 +346,9 @@ const Login = () => {
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-xs font-medium text-text-gray">Password</label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot Password?
-                </a>
+                <button type="button" onClick={handleForgotPassword} disabled={requestingReset || loading} aria-busy={requestingReset} className="text-xs text-primary hover:underline disabled:text-text-muted disabled:no-underline">
+                  {requestingReset ? 'Sending code...' : 'Forgot Password?'}
+                </button>
               </div>
               <div className="relative">
                 <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
@@ -357,11 +379,10 @@ const Login = () => {
                   className="sr-only"
                 />
                 <div
-                  className={`w-4 h-4 rounded border transition-all duration-200 flex items-center justify-center ${
-                    rememberMe
+                  className={`w-4 h-4 rounded border transition-all duration-200 flex items-center justify-center ${rememberMe
                       ? 'bg-primary border-primary'
                       : 'border-border group-hover:border-border-hover'
-                  }`}
+                    }`}
                 >
                   {rememberMe && <CheckIcon className="w-3 h-3 text-white" />}
                 </div>

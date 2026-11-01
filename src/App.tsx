@@ -18,6 +18,8 @@ import Notifications from './pages/user/notifications'
 import Profile from './pages/user/profile'
 import Login from './pages/login'
 import VerifyOtp from './pages/verifyOtp'
+import VerifyPasswordResetOtp from './pages/verifyPasswordResetOtp'
+import ResetPassword from './pages/resetPassword'
 import Unauthorized from './pages/unauthorized'
 import NotFound from './pages/NotFound'
 import AdminDashboard from './pages/Admin/dashboard'
@@ -71,10 +73,10 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 function App() {
   return (
     <>
-     <NotificationProvider>
-      <AuthProvider>
-        <ThemeProvider>
-         
+      <NotificationProvider>
+        <AuthProvider>
+          <ThemeProvider>
+
             <Router>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
@@ -130,14 +132,16 @@ function App() {
                 </Route>
                 <Route path="/register" element={<Register />} />
                 <Route path="/verify-otp" element={<VerifyOtp />} />
+                <Route path="/verify-password-reset-otp" element={<VerifyPasswordResetOtp />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Router>
-          
-        </ThemeProvider>
-      </AuthProvider>
+
+          </ThemeProvider>
+        </AuthProvider>
       </NotificationProvider>
     </>
   )

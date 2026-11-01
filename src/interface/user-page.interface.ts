@@ -40,7 +40,7 @@ export interface CablePackage {
 
 export interface StatCardProps {
   label: string;
-  value: string | number;
+  value: string | number | undefined;
   change: string;
   positive: boolean;
   icon: React.ReactNode;

@@ -1,3 +1,4 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   AreaChart,
@@ -30,6 +31,7 @@ import {
 } from '@heroicons/react/24/outline';
 import type { AdminActivityEvent as ActivityEvent, AdminAlertLog as AlertLog, CableProvider, CableSubscription, PackagePlan, SubscriptionStats } from '../../interface/admin-orders.interface';
 import type { CableCustomer as Customer } from '../../interface/admin-orders.interface';
+import { getAdminCableSubscriptions, retryAdminOrder, updateAdminOrderStatus } from '../../api/adminOrders';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
 // ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
@@ -274,7 +276,7 @@ const PACKAGE_PIE = [
 
 export default function AdminCableTVManagement() {
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [subscriptions, setSubscriptions] = useState<CableSubscription[]>(INITIAL_SUBSCRIPTIONS);
+  const [subscriptions, setSubscriptions] = useState<CableSubscription[]>([]);
   const [alerts, setAlerts] = useState<AlertLog[]>(ALERTS);
   const [feedEvents, setFeedEvents] = useState<ActivityEvent[]>(MONITORING_FEED);
   const [popularPlans, setPopularPlans] = useState<PackagePlan[]>(POPULAR_PACKAGES);
@@ -323,6 +325,18 @@ export default function AdminCableTVManagement() {
   // Export options modal
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportReportType, setExportReportType] = useState('Daily Renewals');
+
+  useEffect(() => {
+    let active = true;
+    getAdminCableSubscriptions()
+      .then((data) => {
+        if (active) setSubscriptions(data);
+      })
+      .catch((error) => console.error('Failed to load cable subscriptions:', error));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Live timeline events update simulator
   useEffect(() => {
@@ -442,16 +456,16 @@ export default function AdminCableTVManagement() {
 
   const totalPages = Math.ceil(sortedSubs.length / itemsPerPage);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setSubscriptions(INITIAL_SUBSCRIPTIONS);
-      setFeedEvents(MONITORING_FEED);
-      setPopularPlans(POPULAR_PACKAGES);
-      setAlerts(ALERTS);
-      setLoading(false);
+    try {
+      setSubscriptions(await getAdminCableSubscriptions());
       triggerToast('Database details refreshed.');
-    }, 750);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh cable subscriptions.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Row selections
@@ -480,49 +494,22 @@ export default function AdminCableTVManagement() {
   };
 
   // Actions
-  const handleRetry = (id: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setSubscriptions(prev => prev.map(s => {
-        if (s.id === id) {
-          return {
-            ...s,
-            status: 'Success',
-            activationStatus: 'Completed',
-            failureReason: undefined,
-            timeline: {
-              ...s.timeline,
-              activated: new Date().toLocaleTimeString(),
-              completed: new Date().toLocaleTimeString()
-            }
-          };
-        }
-        return s;
-      }));
-      setLoading(false);
-      triggerToast(`Re-dispatched renewal for ${id} successfully!`);
+  const handleRetry = async (id: string) => {
+    try {
+      await retryAdminOrder(id);
+      setSubscriptions(await getAdminCableSubscriptions());
+      triggerToast('Status check queued. Refresh to see the provider result.');
       setIsDrawerOpen(false);
-    }, 1000);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to queue a status check.'); }
   };
 
-  const handleRefund = (id: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setSubscriptions(prev => prev.map(s => {
-        if (s.id === id) {
-          return {
-            ...s,
-            status: 'Reversed',
-            activationStatus: 'Reclaimed',
-            failureReason: 'Refunded by administrator.'
-          };
-        }
-        return s;
-      }));
-      setLoading(false);
-      triggerToast(`Transaction ${id} reversed and refunded to user wallet.`);
+  const handleRefund = async (id: string) => {
+    try {
+      const result = await updateAdminOrderStatus(id, 'Reversed') as { status?: string };
+      setSubscriptions(await getAdminCableSubscriptions());
+      triggerToast(result.status === 'pending_review' ? 'Wallet refund requested. Review it in Wallet Adjustments.' : 'Order status refreshed.');
       setIsDrawerOpen(false);
-    }, 1000);
+    } catch (error) { triggerToast(error instanceof Error ? error.message : 'Unable to request a refund.'); }
   };
 
   const handleFlag = (id: string) => {
@@ -577,6 +564,8 @@ export default function AdminCableTVManagement() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark text-text-gray relative">
+      <AdminLoadMore items={subscriptions} load={getAdminCableSubscriptions} onLoaded={setSubscriptions} />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-4 right-4 z-50 bg-bg-card border-l-4 border-primary text-text-white shadow-2xl px-5 py-3.5 rounded-r-xl flex items-center gap-3 animate-slide-in">
@@ -1017,7 +1006,7 @@ export default function AdminCableTVManagement() {
                           ₦{s.amount.toLocaleString()}
                         </td>
                         <td className="py-3.5 px-4 text-right font-bold text-emerald-400">
-                          ₦{s.profit.toLocaleString()}
+                          ₦{s.profit?.toLocaleString() ?? '—'}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 w-fit ${
@@ -1652,7 +1641,7 @@ export default function AdminCableTVManagement() {
                       <div className="bg-bg-dark-secondary/50 border border-border rounded-xl p-4 text-xs space-y-2">
                         <div className="flex justify-between">
                           <span className="text-text-muted">Cost Price</span>
-                          <span className="text-text-white">₦{selectedSub.costPrice.toLocaleString()}</span>
+                          <span className="text-text-white">₦{selectedSub.costPrice?.toLocaleString() ?? '—'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-text-muted">Selling Price</span>
@@ -1660,15 +1649,15 @@ export default function AdminCableTVManagement() {
                         </div>
                         <div className="flex justify-between border-t border-border/30 pt-1.5">
                           <span className="text-emerald-400 font-bold">Net Profit</span>
-                          <span className="font-extrabold text-emerald-400">₦{selectedSub.profit.toLocaleString()}</span>
+                          <span className="font-extrabold text-emerald-400">₦{selectedSub.profit?.toLocaleString() ?? '—'}</span>
                         </div>
                         <div className="flex justify-between pt-1 border-t border-border/30">
                           <span className="text-text-muted">User Wallet Before</span>
-                          <span className="font-mono text-text-white">₦{selectedSub.walletBefore.toLocaleString()}</span>
+                          <span className="font-mono text-text-white">₦{selectedSub.walletBefore?.toLocaleString() ?? '—'}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-text-muted">User Wallet After</span>
-                          <span className="font-mono text-text-white">₦{selectedSub.walletAfter.toLocaleString()}</span>
+                          <span className="font-mono text-text-white">₦{selectedSub.walletAfter?.toLocaleString() ?? '—'}</span>
                         </div>
                       </div>
                     </div>

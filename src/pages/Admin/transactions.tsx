@@ -1,10 +1,11 @@
+import AdminLoadMore from '../../components/AdminLoadMore';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   AreaChart,
   Area,
   BarChart,
   Bar,
-  XAxis,    
+  XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
@@ -27,285 +28,26 @@ import {
   ClockIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import type { AdminTransaction as Transaction, FlaggedTx, RefundRequest } from '../../interface/admin.interface';
+import type { AdminTransaction as Transaction, RefundRequest } from '../../interface/admin.interface';
+import { getAdminPendingReviewCount, getAdminRefundRequests, getAdminTransactionCount, getAdminTransactions, reviewAdminRefundRequest } from '../../api/admin';
 
 // ─── TYPES & INTERFACES ──────────────────────────────────────────────────────
-// ─── INITIAL MOCK DATA ───────────────────────────────────────────────────────
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'SWT-TX-10984',
-    reference: 'REF-MTN-8849102',
-    user: 'Michael Anazodo',
-    email: 'michael@example.com',
-    phone: '+234 803 111 2222',
-    service: 'Airtime',
-    recipient: '08012345678',
-    amount: 1000,
-    fee: 0,
-    status: 'Success',
-    date: '2026-06-20',
-    time: '17:30:15',
-    provider: 'MTN',
-    paymentMethod: 'Wallet',
-    walletBefore: 4500,
-    walletAfter: 3500,
-    timeline: {
-      created: '17:30:00',
-      processing: '17:30:05',
-      completed: '17:30:15',
-      updated: '17:30:15'
-    }
-  },
-  {
-    id: 'SWT-TX-10985',
-    reference: 'REF-GLO-2894103',
-    user: 'Chidi Benson',
-    email: 'chidi.b@example.com',
-    phone: '+234 803 445 7821',
-    service: 'Data',
-    recipient: '08051112222',
-    amount: 3500,
-    fee: 0,
-    status: 'Success',
-    date: '2026-06-20',
-    time: '16:45:00',
-    provider: 'GLO',
-    paymentMethod: 'Wallet',
-    walletBefore: 150000,
-    walletAfter: 146500,
-    timeline: {
-      created: '16:44:30',
-      processing: '16:44:45',
-      completed: '16:45:00',
-      updated: '16:45:00'
-    }
-  },
-  {
-    id: 'SWT-TX-10986',
-    reference: 'REF-AEDC-9844105',
-    user: 'Amara Okafor',
-    email: 'amara.o@example.com',
-    phone: '+234 810 984 5673',
-    service: 'Electricity',
-    recipient: 'Meter: 44021948301',
-    amount: 25000,
-    fee: 100,
-    status: 'Pending',
-    date: '2026-06-20',
-    time: '16:12:30',
-    provider: 'AEDC',
-    paymentMethod: 'Card',
-    walletBefore: 245000,
-    walletAfter: 245000,
-    timeline: {
-      created: '16:12:00',
-      processing: '16:12:15',
-      completed: '-',
-      updated: '16:12:30'
-    }
-  },
-  {
-    id: 'SWT-TX-10987',
-    reference: 'REF-DSTV-2311492',
-    user: 'Tunde Bakare',
-    email: 'tunde.b@example.com',
-    phone: '+234 802 984 5673',
-    service: 'Cable TV',
-    recipient: 'SmartCard: 1029384756',
-    amount: 9500,
-    fee: 50,
-    status: 'Failed',
-    date: '2026-06-20',
-    time: '15:20:10',
-    provider: 'DSTV',
-    paymentMethod: 'Wallet',
-    walletBefore: 14000,
-    walletAfter: 14000,
-    timeline: {
-      created: '15:19:30',
-      processing: '15:19:45',
-      completed: '15:20:10',
-      updated: '15:20:10'
-    }
-  },
-  {
-    id: 'SWT-TX-10988',
-    reference: 'REF-PSTK-0092812',
-    user: 'Fatima Musa',
-    email: 'fatima.m@example.com',
-    phone: '+234 903 234 5678',
-    service: 'Wallet Funding',
-    recipient: 'Wallet Balance',
-    amount: 50000,
-    fee: 0,
-    status: 'Success',
-    date: '2026-06-20',
-    time: '14:05:40',
-    provider: 'Paystack',
-    paymentMethod: 'Bank Transfer',
-    walletBefore: 37000,
-    walletAfter: 87000,
-    timeline: {
-      created: '14:05:00',
-      processing: '14:05:15',
-      completed: '14:05:40',
-      updated: '14:05:40'
-    }
-  },
-  {
-    id: 'SWT-TX-10989',
-    reference: 'REF-MTN-3349108',
-    user: 'Obinna Ani',
-    email: 'obinna.a@example.com',
-    phone: '+234 705 270 5119',
-    service: 'Data',
-    recipient: '08039998888',
-    amount: 1500,
-    fee: 0,
-    status: 'Reversed',
-    date: '2026-06-19',
-    time: '11:42:15',
-    provider: 'MTN',
-    paymentMethod: 'Wallet',
-    walletBefore: 13500,
-    walletAfter: 13500,
-    timeline: {
-      created: '11:40:00',
-      processing: '11:40:30',
-      completed: '11:41:10',
-      updated: '11:42:15'
-    }
-  },
-  {
-    id: 'SWT-TX-10990',
-    reference: 'REF-AIR-2234091',
-    user: 'Aisha Yusuf',
-    email: 'aisha.y@example.com',
-    phone: '+234 803 112 3456',
-    service: 'Airtime',
-    recipient: '09022233344',
-    amount: 5000,
-    fee: 0,
-    status: 'Success',
-    date: '2026-06-19',
-    time: '09:15:30',
-    provider: 'Airtel',
-    paymentMethod: 'Wallet',
-    walletBefore: 325000,
-    walletAfter: 320000,
-    timeline: {
-      created: '09:15:00',
-      processing: '09:15:10',
-      completed: '09:15:30',
-      updated: '09:15:30'
-    }
-  },
-  {
-    id: 'SWT-TX-10991',
-    reference: 'REF-EKEDC-109823',
-    user: 'Grace Emmanuel',
-    email: 'grace.e@example.com',
-    phone: '+234 905 678 1234',
-    service: 'Electricity',
-    recipient: 'Meter: 54109827301',
-    amount: 15000,
-    fee: 100,
-    status: 'Success',
-    date: '2026-06-18',
-    time: '18:50:00',
-    provider: 'EKEDC',
-    paymentMethod: 'Card',
-    walletBefore: 110000,
-    walletAfter: 95000,
-    timeline: {
-      created: '18:49:00',
-      processing: '18:49:30',
-      completed: '18:50:00',
-      updated: '18:50:00'
-    }
-  },
-  {
-    id: 'SWT-TX-10992',
-    reference: 'REF-GOTV-2894101',
-    user: 'David Mark',
-    email: 'david.m@example.com',
-    phone: '+234 812 345 6789',
-    service: 'Cable TV',
-    recipient: 'IUC: 203984110',
-    amount: 4000,
-    fee: 50,
-    status: 'Success',
-    date: '2026-06-18',
-    time: '12:10:45',
-    provider: 'GOTV',
-    paymentMethod: 'Wallet',
-    walletBefore: 4000,
-    walletAfter: 0,
-    timeline: {
-      created: '12:10:00',
-      processing: '12:10:20',
-      completed: '12:10:45',
-      updated: '12:10:45'
-    }
-  }
-];
 
-const INITIAL_REFUNDS: RefundRequest[] = [
-  { id: 'REF-REQ-01', txId: 'SWT-TX-10987', user: 'Tunde Bakare', amount: 9500, reason: 'Cable TV subscription failed but wallet was debited.', submitted: '2026-06-20', status: 'Pending' },
-  { id: 'REF-REQ-02', txId: 'SWT-TX-10989', user: 'Obinna Ani', amount: 1500, reason: 'Data bundle delivery timed out. Autoreversal failed.', submitted: '2026-06-19', status: 'Approved' },
-  { id: 'REF-REQ-03', txId: 'SWT-TX-10991', user: 'Grace Emmanuel', amount: 15000, reason: 'Duplicate card charge occurred during electricity funding.', submitted: '2026-06-18', status: 'Pending' }
-];
-
-const INITIAL_FLAGGED: FlaggedTx[] = [
-  { id: 'FLG-01', txId: 'SWT-TX-10986', user: 'Amara Okafor', riskLevel: 'Medium', reason: 'High amount electricity payment via newly linked card.', assignedAdmin: 'Chidera Obi', status: 'Under Investigation' },
-  { id: 'FLG-02', txId: 'SWT-TX-10988', user: 'Fatima Musa', riskLevel: 'High', reason: 'Instant wallet funding of ₦50,000 from unverified source.', assignedAdmin: 'Super Admin', status: 'Under Investigation' },
-  { id: 'FLG-03', txId: 'SWT-TX-10992', user: 'David Mark', riskLevel: 'Critical', reason: 'Wallet balance drained immediately to zero via Cable TV subscription.', assignedAdmin: 'Aliyu Bello', status: 'Suspended' }
-];
-
-const LIVE_MONITOR_EVENTS = [
-  { id: 1, type: 'funding', text: 'Wallet Funded: @michael credited ₦20,000 via Paystack', time: 'Just now', icon: '💳', color: 'text-emerald-400 bg-emerald-500/10' },
-  { id: 2, type: 'purchase', text: 'Data Purchase Completed: @chidi purchased MTN 10GB Data', time: '2 mins ago', icon: '📶', color: 'text-blue-400 bg-blue-500/10' },
-  { id: 3, type: 'purchase', text: 'Electricity Payment Delivered: @amara purchased AEDC ₦25,000 token', time: '4 mins ago', icon: '⚡', color: 'text-amber-400 bg-amber-500/10' },
-  { id: 4, type: 'purchase', text: 'Cable Subscription Activated: @tunde renewed DSTV Compact (₦9,500)', time: '8 mins ago', icon: '📺', color: 'text-cyan-400 bg-cyan-500/10' },
-  { id: 5, type: 'reversed', text: 'Transaction Reversed: Refunded ₦1,500 to @obinna for failed Data order', time: '15 mins ago', icon: '🔄', color: 'text-red-400 bg-red-500/10' }
-];
-
-// Recharts Charts Data
-const TRANSACTION_VOLUME_DATA = [
-  { name: 'Mon', Volume: 12000000, Count: 18200 },
-  { name: 'Tue', Volume: 14500000, Count: 21100 },
-  { name: 'Wed', Volume: 13200000, Count: 19800 },
-  { name: 'Thu', Volume: 15800000, Count: 22400 },
-  { name: 'Fri', Volume: 18900000, Count: 26800 },
-  { name: 'Sat', Volume: 22400000, Count: 31200 },
-  { name: 'Sun', Volume: 17400000, Count: 24500 }
-];
-
-const SERVICE_DISTRIBUTION_DATA = [
-  { name: 'Airtime', value: 4850000, color: '#3b82f6' },
-  { name: 'Data', value: 6200000, color: '#06b6d4' },
-  { name: 'Electricity', value: 5400000, color: '#10b981' },
-  { name: 'Cable TV', value: 2000000, color: '#f59e0b' },
-  { name: 'Wallet Funding', value: 65800000, color: '#8b5cf6' }
-];
-
-const REFUND_TRENDS_DATA = [
-  { name: 'Jun 14', Requested: 45000, Approved: 45000 },
-  { name: 'Jun 15', Requested: 82000, Approved: 32000 },
-  { name: 'Jun 16', Requested: 15000, Approved: 15000 },
-  { name: 'Jun 17', Requested: 9500, Approved: 9500 },
-  { name: 'Jun 18', Requested: 15000, Approved: 0 },
-  { name: 'Jun 19', Requested: 1500, Approved: 1500 },
-  { name: 'Jun 20', Requested: 24500, Approved: 9500 }
-];
+const SERVICE_COLORS: Record<Transaction['service'], string> = {
+  Airtime: '#3b82f6',
+  Data: '#06b6d4',
+  Electricity: '#10b981',
+  'Cable TV': '#f59e0b',
+  'Wallet Funding': '#8b5cf6',
+};
 
 export default function AdminTransactions() {
-  
+
   // ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
-  const [refunds, setRefunds] = useState<RefundRequest[]>(INITIAL_REFUNDS);
-  const [flagged, setFlagged] = useState<FlaggedTx[]>(INITIAL_FLAGGED);
-  const [liveEvents, setLiveEvents] = useState(LIVE_MONITOR_EVENTS);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  const [totalTransactionCount, setTotalTransactionCount] = useState(0);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -328,36 +70,44 @@ export default function AdminTransactions() {
   const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  
+
   // Modal for Custom Statement Export
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
 
-  // Live Activity Feed Simulator
   useEffect(() => {
-    const interval = setInterval(() => {
-      const eventTypes = [
-        { text: 'Airtime Purchased: @fatima bought MTN ₦500 Airtime', icon: '📶', color: 'text-blue-400 bg-blue-500/10' },
-        { text: 'Wallet Funded: @tunde credited ₦5,000 via Card', icon: '💳', color: 'text-emerald-400 bg-emerald-500/10' },
-        { text: 'Cable Subscription Activated: @grace renewed GOTV Jolli (₦4,000)', icon: '📺', color: 'text-cyan-400 bg-cyan-500/10' },
-        { text: 'Electricity Payment: Meter 89201 credited ₦10,000', icon: '⚡', color: 'text-amber-400 bg-amber-500/10' }
-      ];
-      const randomEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-      const newEvent = {
-        id: Date.now(),
-        type: 'purchase',
-        text: randomEvent.text,
-        time: 'Just now',
-        icon: randomEvent.icon,
-        color: randomEvent.color
-      };
-
-      setLiveEvents(prev => [newEvent, ...prev.slice(0, 4)]);
-    }, 12000);
-    return () => clearInterval(interval);
+    let active = true;
+    setLoading(true);
+    Promise.all([getAdminTransactions(), getAdminRefundRequests(), getAdminPendingReviewCount(), getAdminTransactionCount()])
+      .then(([transactionData, refundData, pendingReviewCount, totalTransactionCount]) => {
+        if (!active) return;
+        setTransactions(transactionData);
+        console.log(transactionData)
+        setRefunds(refundData);
+        setPendingReviewCount(pendingReviewCount);
+        setTotalTransactionCount(totalTransactionCount);
+      })
+      .catch((error) => console.error('Failed to load admin transaction data:', error))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  const liveEvents = useMemo(() => [...transactions]
+    .sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime())
+    .slice(0, 5)
+    .map((tx) => ({
+      id: tx.id,
+      text: `${tx.service} ${tx.status.toLowerCase()}: ${tx.user} · ₦${tx.amount.toLocaleString()}`,
+      time: `${tx.date} ${tx.time}`,
+      icon: tx.service === 'Airtime' ? '📶' : tx.service === 'Electricity' ? '⚡' : tx.service === 'Cable TV' ? '📺' : tx.service === 'Wallet Funding' ? '💳' : '📱',
+      color: tx.status === 'Success' ? 'text-emerald-400 bg-emerald-500/10' : tx.status === 'Failed' ? 'text-red-400 bg-red-500/10' : 'text-amber-400 bg-amber-500/10',
+    })), [transactions]);
 
   // Show Toast Toast Notification Helper
   const triggerToast = (msg: string) => {
@@ -369,7 +119,7 @@ export default function AdminTransactions() {
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       // Global Search
-      const searchMatch = searchQuery === '' || 
+      const searchMatch = searchQuery === '' ||
         tx.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tx.reference.toLowerCase().includes(searchQuery.toLowerCase()) ||
         tx.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -404,8 +154,8 @@ export default function AdminTransactions() {
     const sorted = [...filteredTransactions];
     sorted.sort((a, b) => {
       if (sortField === 'id') {
-        return sortDirection === 'asc' 
-          ? a.id.localeCompare(b.id) 
+        return sortDirection === 'asc'
+          ? a.id.localeCompare(b.id)
           : b.id.localeCompare(a.id);
       } else if (sortField === 'amount') {
         return sortDirection === 'asc' ? a.amount - b.amount : b.amount - a.amount;
@@ -413,8 +163,8 @@ export default function AdminTransactions() {
         // Date sorting
         const dateA = new Date(`${a.date}T${a.time}`);
         const dateB = new Date(`${b.date}T${b.time}`);
-        return sortDirection === 'asc' 
-          ? dateA.getTime() - dateB.getTime() 
+        return sortDirection === 'asc'
+          ? dateA.getTime() - dateB.getTime()
           : dateB.getTime() - dateA.getTime();
       }
     });
@@ -428,6 +178,62 @@ export default function AdminTransactions() {
   }, [sortedTransactions, currentPage]);
 
   const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
+
+  const transactionMetrics = useMemo(() => {
+    const successfulCount = transactions.filter((tx) => tx.status === 'Success').length;
+    return {
+      volume: transactions.reduce((total, tx) => total + tx.amount, 0),
+      fees: transactions.reduce((total, tx) => total + (tx.fee ?? 0), 0),
+      successRate: transactions.length ? (successfulCount / transactions.length) * 100 : 0,
+      successfulCount,
+      failedCount: transactions.filter((tx) => tx.status === 'Failed').length,
+    };
+  }, [transactions]);
+
+  const transactionVolumeData = useMemo(() => {
+    const byDate = new Map<string, { name: string; Volume: number; Count: number; timestamp: number }>();
+    transactions.forEach((tx) => {
+      const timestamp = new Date(tx.date).getTime();
+      const key = tx.date;
+      const name = Number.isNaN(timestamp)
+        ? tx.date
+        : new Date(timestamp).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+      const current = byDate.get(key) || { name, Volume: 0, Count: 0, timestamp };
+      current.Volume += tx.amount;
+      current.Count += 1;
+      byDate.set(key, current);
+    });
+    return [...byDate.values()]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-7);
+  }, [transactions]);
+
+  const serviceDistributionData = useMemo(() => {
+    const totals = new Map<Transaction['service'], number>();
+    transactions.forEach((tx) => totals.set(tx.service, (totals.get(tx.service) || 0) + tx.amount));
+    return [...totals.entries()].map(([name, value]) => ({ name, value, color: SERVICE_COLORS[name] }));
+  }, [transactions]);
+
+  const refundTrendsData = useMemo(() => {
+    const byDate = new Map<string, { name: string; Requested: number; Approved: number; timestamp: number }>();
+    refunds.forEach((refund) => {
+      const key = refund.submitted.slice(0, 10);
+      const timestamp = new Date(key).getTime();
+      const name = Number.isNaN(timestamp)
+        ? key
+        : new Date(timestamp).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+      const current = byDate.get(key) || { name, Requested: 0, Approved: 0, timestamp };
+      current.Requested += refund.amount;
+      if (refund.status === 'Approved') current.Approved += refund.amount;
+      byDate.set(key, current);
+    });
+    return [...byDate.values()].sort((a, b) => a.timestamp - b.timestamp);
+  }, [refunds]);
+
+  const flagged = useMemo(
+    () => transactions.filter((tx) => tx.riskScore && tx.riskScore !== 'Low'),
+    [transactions],
+  );
 
   // Reset filter controls
   const handleResetFilters = () => {
@@ -444,14 +250,27 @@ export default function AdminTransactions() {
     triggerToast('Filters reset successfully.');
   };
 
-  // Run simulated loading refresh
-  const handleRefresh = () => {
+  // Refresh transactions and their related summaries.
+  const handleRefresh = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setTransactions(INITIAL_TRANSACTIONS);
-      setLoading(false);
+    try {
+      const [transactionData, refundData, pendingCount, totalCount] = await Promise.all([
+        getAdminTransactions(),
+        getAdminRefundRequests(),
+        getAdminPendingReviewCount(),
+        getAdminTransactionCount(),
+      ]);
+      setTransactions(transactionData);
+      console.log('Transactions refreshed:', transactionData);
+      setRefunds(refundData);
+      setPendingReviewCount(pendingCount);
+      setTotalTransactionCount(totalCount);
       triggerToast('Transactions refreshed successfully.');
-    }, 850);
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to refresh transactions.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Export handlers
@@ -465,7 +284,7 @@ export default function AdminTransactions() {
 
   // Bulk actions handlers
   const handleSelectRow = (id: string) => {
-    setSelectedTxIds(prev => 
+    setSelectedTxIds(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
@@ -485,9 +304,15 @@ export default function AdminTransactions() {
   };
 
   // Refund actions
-  const handleRefundAction = (reqId: string, status: 'Approved' | 'Rejected') => {
+  const handleRefundAction = async (reqId: string, status: 'Approved' | 'Rejected') => {
+    try {
+      await reviewAdminRefundRequest(reqId, { status });
+    } catch (error) {
+      triggerToast(error instanceof Error ? error.message : 'Failed to review refund request.');
+      return;
+    }
     setRefunds(prev => prev.map(req => req.id === reqId ? { ...req, status } : req));
-    
+
     const request = refunds.find(r => r.id === reqId);
     if (request && status === 'Approved') {
       // Find matching transaction and change to Reversed
@@ -500,47 +325,26 @@ export default function AdminTransactions() {
 
   // Risk flagging
   const handleFlagTransaction = (txId: string) => {
-    setTransactions(prev => prev.map(tx => {
-      if (tx.id === txId) {
-        const isFlagged = tx.riskScore === 'Critical';
-        return { 
-          ...tx, 
-          riskScore: isFlagged ? 'Low' : 'Critical',
-          flaggedReason: isFlagged ? undefined : 'Flagged manually by Admin auditor' 
-        };
-      }
-      return tx;
-    }));
-    
-    // Add to flagged section if not already present
-    const txObj = transactions.find(t => t.id === txId);
-    if (txObj) {
-      const isAlreadyFlagged = flagged.some(f => f.txId === txId);
-      if (!isAlreadyFlagged) {
-        const newFlagged: FlaggedTx = {
-          id: `FLG-${Math.floor(Math.random() * 90) + 10}`,
-          txId: txObj.id,
-          user: txObj.user,
-          riskLevel: 'Critical',
-          reason: 'Flagged manually by Admin auditor',
-          assignedAdmin: 'Current Admin',
-          status: 'Under Investigation'
-        };
-        setFlagged(prev => [newFlagged, ...prev]);
-        triggerToast(`Transaction ${txId} flagged for security review.`);
-      } else {
-        setFlagged(prev => prev.filter(f => f.txId !== txId));
-        triggerToast(`Flag dismissed for Transaction ${txId}.`);
-      }
-    }
-    
+    const transaction = transactions.find((tx) => tx.id === txId);
+    if (!transaction) return;
+
+    const isFlagged = Boolean(transaction.riskScore && transaction.riskScore !== 'Low');
+    setTransactions((prev) => prev.map((tx) => tx.id === txId ? {
+      ...tx,
+      riskScore: isFlagged ? 'Low' : 'Critical',
+      flaggedReason: isFlagged ? undefined : 'Manually flagged in current view',
+    } : tx));
+    triggerToast(isFlagged ? `Flag dismissed for transaction ${txId}.` : `Transaction ${txId} flagged for review.`);
+
     // Close Drawer
     setIsDrawerOpen(false);
   };
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-bg-dark-secondary overflow-y-auto">
-      
+      <AdminLoadMore items={transactions} load={getAdminTransactions} onLoaded={setTransactions} />
+
+
       {/* Toast Alert Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-blue-600 border border-blue-400 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-200">
@@ -589,7 +393,7 @@ export default function AdminTransactions() {
 
         {/* ─── KPI OVERVIEW ───────────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          
+
           {/* Card 1: Total Transactions */}
           <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between hover:scale-102 hover:shadow-lg transition-all duration-200 group">
             <div className="flex items-center justify-between">
@@ -599,13 +403,9 @@ export default function AdminTransactions() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">125,482</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">{totalTransactionCount.toLocaleString()}</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">+11% this wk</span>
-                {/* SVG Mini Sparkline */}
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-emerald-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,10 L10,8 L20,12 L30,5 L40,7 L50,2" />
-                </svg>
+                <span className="text-text-muted">Total reported by API</span>
               </div>
             </div>
           </div>
@@ -619,12 +419,9 @@ export default function AdminTransactions() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">₦84.25M</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">₦{transactionMetrics.volume.toLocaleString()}</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">+14% month</span>
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-emerald-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,12 L12,10 L24,5 L36,7 L50,1" />
-                </svg>
+                <span className="text-text-muted">Across loaded transactions</span>
               </div>
             </div>
           </div>
@@ -638,12 +435,9 @@ export default function AdminTransactions() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">98.7%</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">{transactionMetrics.successRate.toFixed(1)}%</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">+0.3% rate</span>
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-emerald-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,8 L15,8 L25,5 L35,5 L50,3" />
-                </svg>
+                <span className="text-text-muted">{transactionMetrics.successfulCount.toLocaleString()} successful</span>
               </div>
             </div>
           </div>
@@ -657,12 +451,9 @@ export default function AdminTransactions() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">1.1%</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">{transactionMetrics.failedCount.toLocaleString()}</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">-0.4% drop</span>
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-red-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,3 L15,5 L30,12 L50,14" />
-                </svg>
+                <span className="text-text-muted">Failed in loaded transactions</span>
               </div>
             </div>
           </div>
@@ -676,31 +467,25 @@ export default function AdminTransactions() {
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">0.2%</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">{pendingReviewCount.toLocaleString()}</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">-0.1% queue</span>
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-amber-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,12 L15,10 L30,10 L50,11" />
-                </svg>
+                <span className="text-amber-400 font-bold">Awaiting review</span>
               </div>
             </div>
           </div>
 
-          {/* Card 6: Platform Profit */}
+          {/* Card 6: Transaction Fees */}
           <div className="bg-bg-card border border-border rounded-2xl p-4 flex flex-col justify-between hover:scale-102 hover:shadow-lg transition-all duration-200 group">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">Profit</span>
+              <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">Fees</span>
               <div className="p-1.5 rounded-xl bg-blue-500/10 text-blue-500 group-hover:scale-110 transition-transform">
                 <span className="text-xs font-bold">₦</span>
               </div>
             </div>
             <div className="mt-3">
-              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">₦4.58M</h3>
+              <h3 className="text-text-white font-heading font-extrabold text-lg sm:text-xl">₦{transactionMetrics.fees.toLocaleString()}</h3>
               <div className="flex items-center justify-between mt-1 text-[10px]">
-                <span className="text-emerald-400 font-bold">+9.5% profit</span>
-                <svg viewBox="0 0 50 15" className="w-10 h-4 stroke-emerald-500 fill-none" strokeWidth="1.5">
-                  <path d="M0,12 L15,11 L30,5 L50,2" />
-                </svg>
+                <span className="text-text-muted">Fees across loaded transactions</span>
               </div>
             </div>
           </div>
@@ -709,7 +494,7 @@ export default function AdminTransactions() {
 
         {/* ─── TRANSACTION CONTROLS / TOOLBAR ─────────────────────────────────── */}
         <div className="bg-bg-card border border-border rounded-2xl p-5 space-y-4 shadow-xs">
-          
+
           <div className="flex flex-col lg:flex-row items-center gap-3">
             {/* Global Search */}
             <div className="relative w-full lg:flex-1">
@@ -722,7 +507,7 @@ export default function AdminTransactions() {
                 className="w-full text-xs pl-11 pr-4 py-3 bg-bg-dark-secondary text-text-white border border-border rounded-xl focus:outline-hidden focus:border-blue-500 transition-colors"
               />
             </div>
-            
+
             {/* Quick Actions / Apply Filters Buttons */}
             <div className="flex items-center gap-2 w-full lg:w-auto">
               <button
@@ -756,7 +541,7 @@ export default function AdminTransactions() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              
+
               {/* Type Filter */}
               <div>
                 <label className="block text-[10px] font-semibold text-text-muted uppercase mb-1">Type</label>
@@ -872,10 +657,10 @@ export default function AdminTransactions() {
 
         {/* ─── MAIN TRANSACTIONS TABLE & DETAILS DRAWER ───────────────────────── */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-          
+
           {/* Table Container (2/3 width) */}
           <div className="xl:col-span-2 bg-bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
-            
+
             <div className="p-5 border-b border-border flex items-center justify-between">
               <span className="text-text-white font-heading font-extrabold text-sm">Recent Ledger Entries</span>
               <span className="text-[10px] bg-blue-500/10 text-blue-500 px-2.5 py-1 rounded-full font-bold">
@@ -895,7 +680,7 @@ export default function AdminTransactions() {
                         className="rounded border-border focus:ring-blue-500 text-blue-600"
                       />
                     </th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('id'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -904,7 +689,7 @@ export default function AdminTransactions() {
                     <th className="px-4 py-4">User</th>
                     <th className="px-4 py-4">Service</th>
                     <th className="px-4 py-4">Recipient</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('amount'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -912,7 +697,7 @@ export default function AdminTransactions() {
                     </th>
                     <th className="px-4 py-4">Fee</th>
                     <th className="px-4 py-4">Status</th>
-                    <th 
+                    <th
                       onClick={() => { setSortField('date'); setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }}
                       className="px-4 py-4 cursor-pointer hover:text-text-white select-none transition-colors"
                     >
@@ -966,8 +751,8 @@ export default function AdminTransactions() {
                     paginatedTransactions.map((tx) => {
                       const isSelected = selectedTxIds.includes(tx.id);
                       return (
-                        <tr 
-                          key={tx.id} 
+                        <tr
+                          key={tx.id}
                           className={`hover:bg-bg-dark-secondary/30 transition-colors cursor-pointer ${isSelected ? 'bg-blue-500/5' : ''}`}
                           onClick={() => { setSelectedTx(tx); setIsDrawerOpen(true); }}
                         >
@@ -985,31 +770,28 @@ export default function AdminTransactions() {
                             <div className="text-[10px] text-text-muted mt-0.5">{tx.email}</div>
                           </td>
                           <td className="px-4 py-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                              tx.service === 'Wallet Funding' ? 'bg-purple-500/10 text-purple-400' :
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${tx.service === 'Wallet Funding' ? 'bg-purple-500/10 text-purple-400' :
                               tx.service === 'Electricity' ? 'bg-amber-500/10 text-amber-400' :
-                              tx.service === 'Cable TV' ? 'bg-cyan-500/10 text-cyan-400' :
-                              tx.service === 'Data' ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-500/10 text-slate-400'
-                            }`}>
+                                tx.service === 'Cable TV' ? 'bg-cyan-500/10 text-cyan-400' :
+                                  tx.service === 'Data' ? 'bg-blue-500/10 text-blue-400' : 'bg-slate-500/10 text-slate-400'
+                              }`}>
                               {tx.service}
                             </span>
                           </td>
                           <td className="px-4 py-4 font-mono text-[11px] text-text-gray">{tx.recipient}</td>
                           <td className="px-4 py-4 font-bold text-text-white">₦{tx.amount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-text-muted">₦{tx.fee}</td>
+                          <td className="px-4 py-4 text-text-muted">₦{tx.fee ?? '—'}</td>
                           <td className="px-4 py-4">
-                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              tx.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${tx.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
                               tx.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                              tx.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
-                              'bg-slate-500/10 text-text-muted border border-border'
-                            }`}>
-                              <span className={`w-1 h-1 rounded-full ${
-                                tx.status === 'Success' ? 'bg-emerald-400' :
+                                tx.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/25' :
+                                  'bg-slate-500/10 text-text-muted border border-border'
+                              }`}>
+                              <span className={`w-1 h-1 rounded-full ${tx.status === 'Success' ? 'bg-emerald-400' :
                                 tx.status === 'Pending' ? 'bg-amber-400' :
-                                tx.status === 'Failed' ? 'bg-red-400' :
-                                'bg-text-muted'
-                              }`} />
+                                  tx.status === 'Failed' ? 'bg-red-400' :
+                                    'bg-text-muted'
+                                }`} />
                               {tx.status}
                             </span>
                           </td>
@@ -1059,7 +841,7 @@ export default function AdminTransactions() {
                   </span>{' '}
                   of <span className="text-text-white font-bold">{sortedTransactions.length}</span> entries
                 </span>
-                
+
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
@@ -1072,11 +854,10 @@ export default function AdminTransactions() {
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(idx + 1)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
-                        currentPage === idx + 1 
-                          ? 'bg-blue-600 text-white shadow-xs' 
-                          : 'border border-border text-text-muted hover:text-text-white hover:bg-bg-card-hover'
-                      }`}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${currentPage === idx + 1
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'border border-border text-text-muted hover:text-text-white hover:bg-bg-card-hover'
+                        }`}
                     >
                       {idx + 1}
                     </button>
@@ -1096,7 +877,7 @@ export default function AdminTransactions() {
 
           {/* Monitoring Panel & Live Activity (1/3 width) */}
           <div className="space-y-6">
-            
+
             {/* Live Feed Container */}
             <div className="bg-bg-card border border-border rounded-2xl shadow-xs p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
@@ -1112,8 +893,8 @@ export default function AdminTransactions() {
 
               <div className="space-y-2">
                 {liveEvents.map((evt) => (
-                  <div 
-                    key={evt.id} 
+                  <div
+                    key={evt.id}
                     className="flex gap-3 p-3 bg-bg-dark-secondary/40 border border-border/50 rounded-xl items-start hover:bg-bg-dark-secondary/80 transition-all duration-200"
                   >
                     <div className={`p-2 rounded-xl text-sm ${evt.color}`}>
@@ -1179,7 +960,7 @@ export default function AdminTransactions() {
                 {selectedTxIds.length} transactions selected
               </span>
             </div>
-            
+
             <div className="h-px w-full md:h-6 md:w-px bg-border/60" />
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1231,22 +1012,22 @@ export default function AdminTransactions() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            
+
             {/* Chart 1: Volume */}
             <div className="bg-bg-dark-secondary/30 border border-border/50 rounded-xl p-4 space-y-3">
               <span className="text-[11px] font-bold text-text-white uppercase font-heading tracking-wider">Transaction Volume (₦)</span>
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={TRANSACTION_VOLUME_DATA}>
+                  <AreaChart data={transactionVolumeData}>
                     <defs>
                       <linearGradient id="volGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" stroke="var(--bg-muted)" fontSize={10} />
-                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v/1000000}M`} />
+                    <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v / 1000000}M`} />
                     <Tooltip contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }} />
                     <Area type="monotone" dataKey="Volume" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#volGrad)" />
                   </AreaChart>
@@ -1261,7 +1042,7 @@ export default function AdminTransactions() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={SERVICE_DISTRIBUTION_DATA}
+                      data={serviceDistributionData}
                       cx="50%"
                       cy="50%"
                       innerRadius={50}
@@ -1269,7 +1050,7 @@ export default function AdminTransactions() {
                       paddingAngle={4}
                       dataKey="value"
                     >
-                      {SERVICE_DISTRIBUTION_DATA.map((entry, idx) => (
+                      {serviceDistributionData.map((entry, idx) => (
                         <Cell key={`cell-${idx}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -1278,7 +1059,7 @@ export default function AdminTransactions() {
                 </ResponsiveContainer>
                 {/* Legend list */}
                 <div className="flex flex-col gap-1.5 ml-4">
-                  {SERVICE_DISTRIBUTION_DATA.map((item, idx) => (
+                  {serviceDistributionData.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-1.5 text-[9px] text-text-gray">
                       <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                       <span className="font-semibold text-text-white">{item.name}</span>
@@ -1293,7 +1074,7 @@ export default function AdminTransactions() {
               <span className="text-[11px] font-bold text-text-white uppercase font-heading tracking-wider">Refund Request Metrics</span>
               <div className="h-60">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={REFUND_TRENDS_DATA}>
+                  <BarChart data={refundTrendsData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" stroke="var(--bg-muted)" fontSize={10} />
                     <YAxis stroke="var(--bg-muted)" fontSize={10} tickFormatter={(v) => `₦${v}`} />
@@ -1339,11 +1120,10 @@ export default function AdminTransactions() {
                     <td className="px-4 py-4 text-text-gray max-w-xs truncate" title={req.reason}>{req.reason}</td>
                     <td className="px-4 py-4 text-text-muted">{req.submitted}</td>
                     <td className="px-4 py-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        req.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${req.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/25' :
                         req.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/25' :
-                        'bg-red-500/10 text-red-400 border border-red-500/25'
-                      }`}>
+                          'bg-red-500/10 text-red-400 border border-red-500/25'
+                        }`}>
                         {req.status}
                       </span>
                     </td>
@@ -1392,56 +1172,33 @@ export default function AdminTransactions() {
             <table className="w-full min-w-[700px] text-left border-collapse">
               <thead className="bg-bg-dark-secondary/50 text-[10px] uppercase font-bold text-text-muted border-b border-border">
                 <tr>
-                  <th className="px-5 py-4">Incident ID</th>
-                  <th className="px-4 py-4">Transaction ID</th>
+                  <th className="px-5 py-4">Transaction ID</th>
                   <th className="px-4 py-4">User</th>
                   <th className="px-4 py-4">Risk Level</th>
                   <th className="px-4 py-4">Flag Reason</th>
-                  <th className="px-4 py-4">Assigned Auditor</th>
-                  <th className="px-4 py-4">Audit Status</th>
-                  <th className="px-5 py-4 text-center font-bold">Actions</th>
+                  <th className="px-4 py-4">Service</th>
+                  <th className="px-4 py-4">Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-xs">
                 {flagged.map(incident => (
                   <tr key={incident.id} className="hover:bg-bg-dark-secondary/20 transition-colors">
-                    <td className="px-5 py-4 font-mono font-bold text-text-white">{incident.id}</td>
-                    <td className="px-4 py-4 font-mono text-blue-500">{incident.txId}</td>
+                    <td className="px-5 py-4 font-mono text-blue-500">{incident.id}</td>
                     <td className="px-4 py-4 font-semibold text-text-white">{incident.user}</td>
                     <td className="px-4 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        incident.riskLevel === 'Critical' ? 'bg-red-500/15 text-red-400 border border-red-500/20' :
-                        incident.riskLevel === 'High' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/20' :
-                        incident.riskLevel === 'Medium' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
-                        'bg-blue-500/15 text-blue-400 border border-blue-500/20'
-                      }`}>
-                        ⚠️ {incident.riskLevel}
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${incident.riskScore === 'Critical' ? 'bg-red-500/15 text-red-400 border border-red-500/20' :
+                        incident.riskScore === 'High' ? 'bg-orange-500/15 text-orange-400 border border-orange-500/20' :
+                          incident.riskScore === 'Medium' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                            'bg-blue-500/15 text-blue-400 border border-blue-500/20'
+                        }`}>
+                        ⚠️ {incident.riskScore}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-text-gray max-w-xs truncate" title={incident.reason}>{incident.reason}</td>
-                    <td className="px-4 py-4 text-text-muted">{incident.assignedAdmin}</td>
-                    <td className="px-4 py-4">
-                      <span className="text-text-white font-medium">{incident.status}</span>
+                    <td className="px-4 py-4 text-text-gray max-w-xs truncate" title={incident.flaggedReason || ''}>
+                      {incident.flaggedReason || 'Flagged by API risk score'}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            setFlagged(prev => prev.filter(f => f.id !== incident.id));
-                            triggerToast(`Incident ${incident.id} cleared and archived.`);
-                          }}
-                          className="px-2.5 py-1.5 bg-bg-dark-secondary hover:bg-bg-card-hover border border-border text-text-white text-[10px] font-bold rounded-lg transition-colors"
-                        >
-                          Dismiss
-                        </button>
-                        <button
-                          onClick={() => triggerToast(`Incident ${incident.id} escalated to Director Auditor.`)}
-                          className="px-2.5 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold rounded-lg shadow-sm transition-colors"
-                        >
-                          Escalate
-                        </button>
-                      </div>
-                    </td>
+                    <td className="px-4 py-4 text-text-white">{incident.service}</td>
+                    <td className="px-4 py-4 text-text-muted">{incident.date} {incident.time}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1451,14 +1208,12 @@ export default function AdminTransactions() {
 
       </main>
 
-      {/* ─── TRANSACTION DETAIL DRAWER (SLIDE OVER) ─────────────────────────── */}
+      {/* ─── TRANSACTION DETAIL DRAWER (SLIDE OVER) ─── */}
       {isDrawerOpen && selectedTx && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs">
-          {/* Backdrop closer clicker */}
           <div onClick={() => setIsDrawerOpen(false)} className="flex-1" />
-          
           <div className="w-full max-w-lg bg-bg-card border-l border-border h-full flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
-            
+
             {/* Drawer Header */}
             <div className="p-6 border-b border-border flex items-center justify-between bg-bg-dark-secondary/40">
               <div className="flex items-center gap-3">
@@ -1480,19 +1235,18 @@ export default function AdminTransactions() {
 
             {/* Scrollable contents */}
             <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-              
+
               {/* Status Header Block */}
               <div className="p-4 rounded-2xl bg-bg-dark-secondary/40 border border-border/80 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] uppercase font-bold text-text-muted tracking-wide">Status Flag</span>
                   <p className="text-text-white font-bold text-sm mt-0.5">{selectedTx.status}</p>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
-                  selectedTx.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${selectedTx.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                   selectedTx.status === 'Pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                  selectedTx.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
-                  'bg-slate-500/10 text-text-muted border border-border'
-                }`}>
+                    selectedTx.status === 'Failed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                      'bg-slate-500/10 text-text-muted border border-border'
+                  }`}>
                   {selectedTx.status}
                 </span>
               </div>
@@ -1570,15 +1324,15 @@ export default function AdminTransactions() {
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Commission Fee</span>
-                    <span className="text-text-white">₦{selectedTx.fee}</span>
+                    <span className="text-text-white">₦{selectedTx.fee ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Wallet Bal Before</span>
-                    <span className="text-text-muted">₦{selectedTx.walletBefore.toLocaleString()}</span>
+                    <span className="text-text-muted">₦{selectedTx.walletBefore?.toLocaleString() ?? '—'}</span>
                   </div>
                   <div>
                     <span className="block text-[10px] text-text-muted uppercase font-semibold">Wallet Bal After</span>
-                    <span className="text-text-white font-bold">₦{selectedTx.walletAfter.toLocaleString()}</span>
+                    <span className="text-text-white font-bold">₦{selectedTx.walletAfter?.toLocaleString() ?? '—'}</span>
                   </div>
                 </div>
               </div>
@@ -1586,11 +1340,11 @@ export default function AdminTransactions() {
               {/* Timeline Stepper */}
               <div className="space-y-4">
                 <h4 className="text-text-white font-heading font-bold text-xs uppercase tracking-wider border-b border-border/50 pb-1.5">Reconciliation Timeline</h4>
-                
+
                 <div className="relative pl-6 space-y-4">
                   {/* Vertical bar */}
                   <div className="absolute left-2.5 top-1.5 bottom-1.5 w-0.5 bg-border" />
-                  
+
                   {/* Step 1: Created */}
                   <div className="relative flex gap-3 text-xs">
                     <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-blue-500 border border-bg-card" />
@@ -1611,10 +1365,9 @@ export default function AdminTransactions() {
 
                   {/* Step 3: Finished */}
                   <div className="relative flex gap-3 text-xs">
-                    <div className={`absolute -left-[21px] w-2.5 h-2.5 rounded-full border border-bg-card ${
-                      selectedTx.status === 'Success' ? 'bg-emerald-500' :
+                    <div className={`absolute -left-[21px] w-2.5 h-2.5 rounded-full border border-bg-card ${selectedTx.status === 'Success' ? 'bg-emerald-500' :
                       selectedTx.status === 'Pending' ? 'bg-amber-500' : 'bg-red-500'
-                    }`} />
+                      }`} />
                     <div>
                       <span className="font-semibold text-text-white block">Reconciliation Finished</span>
                       <span className="text-[10px] text-text-muted">{selectedTx.date} at {selectedTx.timeline.completed}</span>
@@ -1662,7 +1415,7 @@ export default function AdminTransactions() {
             >
               ✕
             </button>
-            
+
             <h3 className="text-text-white font-heading font-extrabold text-base mb-2">Export Transaction Statement</h3>
             <p className="text-text-gray text-xs mb-4">
               Select output parameters for generating audits. Selected records will compile and download instantly.
@@ -1694,7 +1447,7 @@ export default function AdminTransactions() {
                   <option>Latest 100 entries</option>
                   <option>Latest 500 entries</option>
                   <option>Latest 1000 entries</option>
-                  <option>All transactions (125,482 entries)</option>
+                  <option>All transactions ({totalTransactionCount.toLocaleString()} entries)</option>
                 </select>
               </div>
 
