@@ -19,7 +19,7 @@ export type UpdateAdminUserPayload = Partial<
         | 'lastName'
         | 'phone'
         | 'role'
-        | 'status'
+        | 'accountStatus'
         | 'emailVerified'
         | 'phoneVerified'
         | 'identityVerified'

@@ -5,6 +5,7 @@ import http from "../api/http";
 import  ApiError  from "../api/ApiError";
 import  useAuthStore  from "../api/store";
 import {getUser} from "../api/user";
+import { googleOAuth as requestGoogleOAuth } from "../api/auth";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -110,7 +111,31 @@ console.log(response)
     }
   }
 
-  
+  const googleOAuth = async (token: string) => {
+    const result = await requestGoogleOAuth(token);
+    if (!result.success) return result;
+
+    const response = result.response;
+    const user = response.user || response.data?.user || response as UserApiResponse['response'];
+    const accessToken = response.token || response.data?.token || user.token || null;
+    const otpId = response.otpId || response.data?.otpId || user.otpId;
+
+    if (user.email) {
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      setAccessToken(accessToken);
+    }
+
+    return {
+      ...result,
+      response: {
+        ...user,
+        ...(otpId ? { otpId } : {}),
+        ...(accessToken ? { token: accessToken } : {}),
+      },
+    };
+  };
+
 
   // ── Logout ───────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
@@ -129,7 +154,7 @@ console.log(response)
   // ── Mock Transactions ────────────────────────────────────────────────────────
   
   return (
-  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, logout, currentUser, accountBalance, setAccountBalance, response: currentUser, user: currentUser}}>
+  <AuthContext.Provider value={{isAuthenticated, setIsAuthenticated, login, register, googleOAuth, logout, currentUser, accountBalance, setAccountBalance, response: currentUser, user: currentUser}}>
     {children}
   </AuthContext.Provider>
   )

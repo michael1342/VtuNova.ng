@@ -1,6 +1,10 @@
 # VtuNova
 VTU company
 
+## Google sign-up
+
+Set `VITE_GOOGLE_CLIENT_ID` to the OAuth 2.0 client ID for a Google web application. Add each deployed frontend origin to that client's authorized JavaScript origins. The client ID is public and is used by the register page to request a Google ID token; the backend validates that token through `/auth/google-signup`.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

@@ -19,6 +19,7 @@ import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
 import ApiError from '../api/ApiError';
 import { requestPasswordReset } from '../api/auth';
+import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
 
 
 // console.log(localStorage.getItem('vtuNova_key'))
@@ -37,6 +38,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [, setShowError] = useState(false)
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [requestingReset, setRequestingReset] = useState(false);
   const [animateShake, setAnimateShake] = useState(false);
   const [success, setSuccess] = useState('');
@@ -49,7 +51,8 @@ const Login = () => {
   const [params] = useSearchParams();
   // const { login } = useAuth() as { login: (credentials: { email: string; password?: string }) => { success: boolean; error?: string ; user?: any } };
   const { theme, toggleTheme } = useTheme() as { theme: string, toggleTheme: () => void };
-  const { login, currentUser } = useAuth()
+  const { login, googleOAuth } = useAuth()
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   const set = (k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -133,6 +136,43 @@ const Login = () => {
       triggerError(resetError instanceof ApiError ? resetError.message : 'Unable to send a reset code. Please try again.');
     } finally {
       setRequestingReset(false);
+    }
+  };
+
+  const handleGoogleLogin = async (credentialResponse: CredentialResponse) => {
+    if (!credentialResponse.credential) {
+      triggerError('Google did not provide an account token. Please try again.');
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setGoogleLoading(true);
+    try {
+      const result = await googleOAuth(credentialResponse.credential);
+      if (!result?.success || !result.response) {
+        triggerError(result?.error || 'Google sign-in failed. Please try again.');
+        return;
+      }
+
+      const user = result.response;
+      if (user.otpId && user.email) {
+        navigate('/verify-otp', { state: { email: user.email, otpId: user.otpId } });
+        return;
+      }
+
+      const role = user.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || 'user';
+      const roleHome: Record<string, string> = {
+        user: '/user/dashboard',
+        admin: '/admin/dashboard',
+      };
+      navigate(roleHome[role] || params.get('from') || '/user/dashboard');
+    } catch (googleError) {
+      triggerError(googleError instanceof ApiError
+        ? googleError.message
+        : 'Google sign-in failed. Please try again.');
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -422,15 +462,31 @@ const Login = () => {
 
           {/* Social login buttons */}
           <div className="space-y-3">
-            <button className="w-full py-2.5 rounded-xl border border-border bg-bg-card text-text-white text-sm font-medium hover:bg-bg-card-hover hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2.5">
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-              </svg>
-              Continue with Google
-            </button>
+            {googleClientId ? (
+              <div className="w-full flex justify-center">
+                {googleLoading ? (
+                  <span className="text-sm text-text-muted">Completing Google sign-in...</span>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={(credentialResponse) => void handleGoogleLogin(credentialResponse)}
+                    onError={() => triggerError('Google sign-in could not be completed. Please try again.')}
+                    text="continue_with"
+                    theme="outline"
+                    shape="rectangular"
+                    size="large"
+                  />
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={googleLoading}
+                onClick={() => triggerError('Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID to enable it.')}
+                className="w-full py-2.5 rounded-xl border border-border bg-bg-card text-text-white text-sm font-medium hover:bg-bg-card-hover hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2.5 disabled:opacity-60"
+              >
+                Continue with Google
+              </button>
+            )}
             <button className="w-full py-2.5 rounded-xl border border-border bg-bg-card text-text-white text-sm font-medium hover:bg-bg-card-hover hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2.5">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />

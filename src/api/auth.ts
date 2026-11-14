@@ -15,6 +15,18 @@ export interface ResetPasswordPayload {
     confirmPassword: string;
 }
 
+export interface GoogleOAuthResponse {
+    user?: User;
+    token?: string;
+    otpId?: string;
+    data?: {
+        user?: User;
+        token?: string;
+        otpId?: string;
+    };
+    [key: string]: unknown;
+}
+
 type OtpServiceResponse = User & { success?: boolean; error?: string };
 
 export const verifyOtp = async (data: OtpPayload) => {
@@ -72,5 +84,19 @@ export const resetPassword = async (data: ResetPasswordPayload) => {
     } catch (err) {
         if (err instanceof ApiError) return { success: false, error: err.message, response: [] }
         return { success: false, error: (err as any)?.message || 'Failed to fetch user data', response: {} as User };
+    }
+}
+
+export const googleOAuth = async (token: string): Promise<
+    | { response: GoogleOAuthResponse; success: true; error: '' }
+    | { success: false; error: string }
+> => {
+    try {
+        const response = await http.post<GoogleOAuthResponse>("/auth/google-OAuth", { credential: token }) as unknown as GoogleOAuthResponse;
+        if (!response) return { success: false, error: 'No response received from Google sign-in.' };
+        return { response, success: true, error: '' };
+    } catch (err) {
+        if (err instanceof ApiError) return { success: false, error: err.message };
+        return { success: false, error: err instanceof Error ? err.message : 'Google sign-in failed.' };
     }
 }

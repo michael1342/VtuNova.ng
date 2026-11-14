@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ThemeProvider } from './context/themeContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 // import ProtectedRoute from './utils/protected'
 import MainLayout from './components/layout/MainLayout'
 import LandingPage from './pages/landingPage'
@@ -71,6 +72,8 @@ const ProtectedRoute = ({ allowedRoles, children }: ProtectedRouteProps) => {
 
 
 function App() {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+
   return (
     <>
       <NotificationProvider>
@@ -130,11 +133,19 @@ function App() {
                   <Route path="/admin/support" element={<ProtectedRoute allowedRoles={['admin']}><AdminSupport /></ProtectedRoute>} />
                   <Route path="/admin/roles" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
                 </Route>
-                <Route path="/register" element={<Register />} />
+                <Route path="/register" element={googleClientId ? (
+                  <GoogleOAuthProvider clientId={googleClientId}>
+                    <Register />
+                  </GoogleOAuthProvider>
+                ) : <Register />} />
                 <Route path="/verify-otp" element={<VerifyOtp />} />
                 <Route path="/verify-password-reset-otp" element={<VerifyPasswordResetOtp />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/login" element={<Login />} />
+                <Route path="/login" element={googleClientId ? (
+                  <GoogleOAuthProvider clientId={googleClientId}>
+                    <Login />
+                  </GoogleOAuthProvider>
+                ) : <Login />} />
                 <Route path="/unauthorized" element={<Unauthorized />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

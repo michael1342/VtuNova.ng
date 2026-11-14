@@ -31,6 +31,7 @@ export interface AuthContextType {
   response: User | null;
   user: User | null;
   register: (credentials: RegistrationCredentials) => Promise<any>;
+  googleOAuth: (token: string) => Promise<any>;
   login: (credentials: LoginCredentials) => Promise<any>;
   logout: () => void;
 }

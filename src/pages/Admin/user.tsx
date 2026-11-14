@@ -96,7 +96,7 @@ export default function AdminUserManagement() {
 
   // Search & Filters toolbar
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Suspended'>('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'active' | 'suspended'>('All');
   const [verifyFilter, setVerifyFilter] = useState<'All' | 'Verified' | 'Pending' | 'Unverified'>('All');
   const [roleFilter, setRoleFilter] = useState<'All' | 'User' | 'Agent' | 'Admin'>('All');
   const [balanceFilter, setBalanceFilter] = useState<'All' | 'Zero' | 'High'>('All');
@@ -144,6 +144,7 @@ export default function AdminUserManagement() {
     if (isEmptyState) return [];
 
     let result = [...users];
+    console.log('Filtering users with:', users);
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -158,7 +159,7 @@ export default function AdminUserManagement() {
     }
 
     if (statusFilter !== 'All') {
-      result = result.filter((u) => u.status === statusFilter);
+      result = result.filter((u) => u.accountStatus === statusFilter);
     }
 
     if (verifyFilter !== 'All') {
@@ -301,12 +302,12 @@ export default function AdminUserManagement() {
     alert(`Verification update applied.`);
   };
 
-  const handleStatusChange = async (userId: string, newStatus: UserAccount['status']) => {
+  const handleStatusChange = async (userId: string, newStatus: UserAccount['accountStatus']) => {
     const user = users.find((item) => item.id === userId);
-    if (!user || user.status === newStatus) return;
+    if (!user || user.accountStatus === newStatus) return;
 
     try {
-      if (newStatus === 'Suspended') {
+      if (newStatus === 'suspended') {
         await suspendUser(userId);
       } else {
         await activateUser(userId);
@@ -316,12 +317,12 @@ export default function AdminUserManagement() {
       return;
     }
 
-    setUsers((prev) => prev.map((item) => item.id === userId ? { ...item, status: newStatus } : item));
+    setUsers((prev) => prev.map((item) => item.id === userId ? { ...item, accountStatus: newStatus } : item));
     if (selectedUser?.id === userId) {
-      setSelectedUser((prev) => prev ? { ...prev, status: newStatus } : prev);
+      setSelectedUser((prev) => prev ? { ...prev, accountStatus: newStatus } : prev);
     }
 
-    if (newStatus === 'Suspended') {
+    if (newStatus === 'suspended') {
       setSuspendedUsers((prev) => prev + 1);
       setActiveUsers((prev) => Math.max(0, prev - 1));
     } else {
@@ -337,7 +338,7 @@ export default function AdminUserManagement() {
         text: `Admin updated account status to: ${newStatus}`,
         time: 'Just now',
         icon: '🛡️',
-        color: newStatus === 'Active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500',
+        color: newStatus === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500',
       },
       ...prev,
     ]);
@@ -731,9 +732,9 @@ export default function AdminUserManagement() {
                           {/* Status */}
                           <td className="py-3.5 pr-4">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border
-                                ${u.status === 'Active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}
+                                ${u.accountStatus.toLowerCase() === 'active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}
                               `}>
-                              {u.status}
+                              {u.accountStatus}
                             </span>
                           </td>
 
@@ -757,12 +758,12 @@ export default function AdminUserManagement() {
                                 <button onClick={() => { setSelectedUser(u); setActiveModal('walletAdjust'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-text-white hover:bg-bg-card-hover transition-colors flex items-center gap-2">
                                   💰 Credit/Debit Wallet
                                 </button>
-                                {u.status === 'Active' ? (
-                                  <button onClick={() => { handleStatusChange(u.id, 'Suspended'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
+                                {u.accountStatus === 'active' ? (
+                                  <button onClick={() => { handleStatusChange(u.id, 'suspended'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-2">
                                     🚫 Suspend User
                                   </button>
                                 ) : (
-                                  <button onClick={() => { handleStatusChange(u.id, 'Active'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2">
+                                  <button onClick={() => { handleStatusChange(u.id, 'active'); setActionsMenuUser(null); }} className="w-full px-4 py-2 text-xs text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2">
                                     🟢 Reactivate
                                   </button>
                                 )}
@@ -972,8 +973,8 @@ export default function AdminUserManagement() {
                   </div>
                   <div>
                     <span className="text-text-muted block mb-0.5">Current Status</span>
-                    <span className={selectedUser.status === 'Active' ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
-                      {selectedUser.status}
+                    <span className={selectedUser.accountStatus === 'active' ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                      {selectedUser.accountStatus}
                     </span>
                   </div>
                   <div>
@@ -1109,16 +1110,16 @@ export default function AdminUserManagement() {
                 Send notification
               </button>
 
-              {selectedUser.status === 'Active' ? (
+              {selectedUser.accountStatus === 'active' ? (
                 <button
-                  onClick={() => handleStatusChange(selectedUser.id, 'Suspended')}
+                  onClick={() => handleStatusChange(selectedUser.id, 'suspended')}
                   className="flex-1 py-2.5 bg-red-500/15 border border-red-500/20 text-red-400 hover:bg-red-500/25 rounded-xl text-xs font-semibold transition-colors"
                 >
                   Suspend User
                 </button>
               ) : (
                 <button
-                  onClick={() => handleStatusChange(selectedUser.id, 'Active')}
+                  onClick={() => handleStatusChange(selectedUser.id, 'active')}
                   className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25 rounded-xl text-xs font-semibold transition-colors"
                 >
                   Reactivate
