@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { CablePackage } from '../../interface/user-page.interface';
+import posthog from '../../posthog';
 
 const packagesData: Record<string, CablePackage[]> = {
   dstv: [
@@ -74,6 +75,11 @@ const BuyCableSubscription = () => {
     await new Promise((r) => setTimeout(r, 2000));
     setLoading(false);
     setSuccess(true);
+    posthog.capture('cable_subscription_renewed', {
+      provider,
+      package_id: selectedPackage.id,
+      amount: selectedPackage.price,
+    });
   };
 
   return (

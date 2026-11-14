@@ -21,6 +21,7 @@ import { BoltIcon as BoltSolidIcon } from '@heroicons/react/24/solid';
 import { useTheme } from '../context/themeContext';
 import ApiError from '../api/ApiError';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import posthog from '../posthog';
 
 const Register = () => {
   const [form, setForm] = useState({
@@ -115,6 +116,10 @@ const Register = () => {
       setLoading(false);
 
       if (res && res.success) {
+        posthog.capture('registration_completed', {
+          method: 'password',
+          has_referral_code: Boolean(form.referralCode.trim()),
+        });
         setSuccess('Account created. Check your email for the verification code.');
         setTimeout(() => navigate('/verify-otp', {
           state: { email: form.email.trim(), otpId: res.otpId || res.response?.otpId || res.response?.data?.otpId },
@@ -154,6 +159,7 @@ const Register = () => {
 
       const user = result.response;
       if (user.otpId && user.email) {
+        posthog.capture('registration_completed', { method: 'google' });
         setSuccess('Account created. Check your email for the verification code.');
         navigate('/verify-otp', { state: { email: user.email, otpId: user.otpId } });
         return;

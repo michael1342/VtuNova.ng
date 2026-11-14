@@ -5,6 +5,7 @@ import { getTransactions } from '../../api/user';
 import { verifyMeter, buyElectricity } from '../../api/vtuApi';
 import { useNavigate } from 'react-router-dom';
 import generateRequestID from '../../utils/generateRequestID';
+import posthog from '../../posthog';
 
 
 const discos = [
@@ -246,6 +247,11 @@ const scrollToTop = () => {
         setLoading(false);
         setSuccess(true);
         setErrorMessage(null);
+        posthog.capture('electricity_bill_payment_completed', {
+          amount: activeAmount,
+          provider: selectedDisco,
+          meter_type: meterType.toLowerCase(),
+        });
        const token = res?.response?.Vtu?.purchased_code
           console.log(res)
           setAccountBalance(Math.max(0, (accountBalance ?? 0) - activeAmount));

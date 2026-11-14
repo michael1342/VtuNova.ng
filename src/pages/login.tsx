@@ -20,6 +20,7 @@ import { useTheme } from '../context/themeContext';
 import ApiError from '../api/ApiError';
 import { requestPasswordReset } from '../api/auth';
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google';
+import posthog from '../posthog';
 
 
 // console.log(localStorage.getItem('vtuNova_key'))
@@ -94,6 +95,7 @@ const Login = () => {
       // console.log(form.email, form.password)
 
       if (res && res.success) {
+        posthog.capture('login_completed', { method: 'password' });
         setSuccess('Access granted! Redirecting...');
         const roleHome: /* Record<string, string> */any = {
           user: '/user/dashboard',
@@ -162,6 +164,7 @@ const Login = () => {
       }
 
       const role = user.role?.toLowerCase().trim().replace(/[\s_-]/g, '') || 'user';
+      posthog.capture('login_completed', { method: 'google' });
       const roleHome: Record<string, string> = {
         user: '/user/dashboard',
         admin: '/admin/dashboard',

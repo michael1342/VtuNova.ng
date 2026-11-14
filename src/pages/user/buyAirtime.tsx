@@ -8,6 +8,7 @@ import { buyAirtime as ApiBuyAirtime } from '../../api/vtuApi';
 
 import NetworkIcon from '../../components/NetworkIcon';
 import type { Beneficiary } from '../../interface/user-page.interface';
+import posthog from '../../posthog';
 
 const networks = [
   { id: 'mtn', name: 'MTN', color: '#f59e0b', bg: 'bg-amber-500/15', text: 'text-amber-400', desc: 'Everywhere you go' },
@@ -237,6 +238,10 @@ const BuyAirtime: React.FC = () => {
         setShowPayModal(false);
         setSuccess(true);
         setErrorMessage(null);
+        posthog.capture('airtime_purchase_completed', {
+          amount: activeAmount,
+          network: selectedNetwork,
+        });
         // return
       } else {
         setLoading(false);

@@ -5,6 +5,7 @@ import Logo from '../components/Logo';
 import { resetPassword } from '../api/auth';
 import ApiError from '../api/ApiError';
 import { useTheme } from '../context/themeContext';
+import posthog from '../posthog';
 
 interface ResetPasswordRouteState {
     resetToken?: string;
@@ -38,6 +39,7 @@ const ResetPassword = () => {
                 confirmPassword: passwords.confirmPassword,
             });
             if (!result?.success) throw new Error(result?.error || 'Unable to reset your password.');
+            posthog.capture('password_reset_completed');
             setPasswords({ newPassword: '', confirmPassword: '' });
             setResetToken('');
             setCompleted(true);
