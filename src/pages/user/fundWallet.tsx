@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { getTransactions } from '../../api/user';
 import { formatAmount, formatDate } from '../../utils/formatter';
 import { type Transaction } from '../../interface/user.interface';
+import posthog from '../../posthog';
 
 const presetAmounts = [1000, 2000, 5000, 10000, 20000, 50000];
 
@@ -158,6 +159,10 @@ const FundWallet: React.FC = () => {
       const paymentResponse = initRes.response as { data?: { authorization_url?: string }; authorization_url?: string } | undefined;
       const authUrl = paymentResponse?.data?.authorization_url || paymentResponse?.authorization_url;
       if (authUrl) {
+        posthog.capture('wallet_funding_checkout_started', {
+          amount: activeAmount,
+          method,
+        });
         //redirect
         window.location.href = authUrl;
       }

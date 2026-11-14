@@ -6,6 +6,7 @@ import { resendOtp, verifyOtp } from '../api/auth';
 import ApiError from '../api/ApiError';
 import { useTheme } from '../context/themeContext';
 import type { VerificationState } from '../interface/user-page.interface';
+import posthog from '../posthog';
 
 const OTP_DURATION_SECONDS = 5 * 60;
 const OTP_EXPIRY_STORAGE_KEY = 'vtuNova_otp_expires_at';
@@ -95,6 +96,7 @@ const VerifyOtp = () => {
     try {
       const response = await verifyOtp({ email: email.trim(), otp, otpId: otpId || undefined });
       if (!response?.success) throw new Error(response?.error || 'That code is not valid.');
+      posthog.capture('email_verification_completed');
       sessionStorage.removeItem('vtuNova_pending_email');
       setSuccess('Email verified. Taking you to sign in...');
       window.setTimeout(() => navigate('/login', { state: { email: email.trim() } }), 900);

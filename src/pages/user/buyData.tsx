@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { formatAmount } from '../../utils/formatter';
 import NetworkIcon from '../../components/NetworkIcon';
 import type { BackendVariation, Beneficiary, FormattedPlan } from '../../interface/user-page.interface';
+import posthog from '../../posthog';
 
 const networks = [
   { id: 'mtn', serviceId: 'mtn-data', name: 'MTN', color: '#f59e0b', bg: 'bg-amber-500/15', text: 'text-amber-400', desc: 'Everywhere you go' },
@@ -338,6 +339,12 @@ const BuyData: React.FC = () => {
         setShowPayModal(false);
         setSuccess(true);
         setErrorMessage(null);
+        posthog.capture('data_purchase_completed', {
+          amount: selectedPlan.amount,
+          network: selectedNetwork,
+          plan_category: selectedPlan.category,
+          data_size: selectedPlan.dataSize,
+        });
       } else {
         setLoading(false);
         setShowPayModal(false);
