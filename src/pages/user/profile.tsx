@@ -256,7 +256,10 @@ export default function Profile() {
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected for upload.');
+      return;
+    }
     const formData = new FormData();
 
     formData.append("photo", file);
@@ -270,7 +273,7 @@ export default function Profile() {
           const profilePath = typeof currentUser?.profilePic === 'object'
             ? currentUser.profilePic?.url
             : currentUser?.profilePic;
-          setProfilePhoto(profilePath ? `https://api.vtunova.cv/${profilePath}` : event.target.result.toString());
+          setProfilePhoto(profilePath ? `${profilePath}` : event.target.result.toString());
           triggerToast('Profile photo updated successfully!', 'success');
         }
       };
@@ -368,8 +371,8 @@ export default function Profile() {
                     )} */}
                       <img
                         src={typeof currentUser?.profilePic === 'object'
-                          ? (currentUser.profilePic?.url ? `https://api.vtunova.cv/${currentUser.profilePic.url}` : '')
-                          : (currentUser?.profilePic ? `https://api.vtunova.cv/${currentUser.profilePic}` : '')}
+                          ? (currentUser.profilePic?.url ? `${currentUser.profilePic.url}` : '')
+                          : (currentUser?.profilePic ? `${currentUser.profilePic}` : '')}
                         alt="Avatar"
                         className="w-full h-full object-cover"
                       />
